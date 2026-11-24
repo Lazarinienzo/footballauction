@@ -337,3 +337,9 @@ Object.assign(I18N.en, {
   'A sala foi encerrada.': 'The room was closed.', 'Conexão perdida.': 'Connection lost.', 'Digite o código de 4 letras.': 'Enter the 4-character code.',
   'Não deu pra conectar. Tente de novo.': "Couldn't connect. Try again.", 'Copie o link:': 'Copy the link:'
 });
+Object.assign(I18N.en, {
+  'Voltar para o início': 'Back to home', 'Toque num time pra ver o elenco dele.': "Tap a team to see its lineup.", 'Elenco do time': 'Team lineup',
+  '{n}/16 titulares · sobram {b}': '{n}/16 starters · {b} left',
+  'Sair do leilão? Um bot joga no seu lugar e você pode voltar pelo código da sala.': 'Leave the auction? A bot plays in your place and you can come back with the room code.',
+  'Sair do leilão? O progresso desse leilão se perde.': 'Leave the auction? Progress in this auction will be lost.'
+});

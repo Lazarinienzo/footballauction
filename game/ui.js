@@ -536,11 +536,36 @@ function paintTable() {
   G.teams.forEach((t, i) => {
     const r = rows[i]; if (!r) return;
     r.classList.toggle('lead', A.leader === t && A.phase === 'bidding');
+    r.classList.toggle('out', A.phase === 'bidding' && A.passed.has(t));
+    r.dataset.t = t.id; r.tabIndex = 0; r.setAttribute('role', 'button');
     tween(r.children[2], t.budget, dollars);
     setText(r.children[3], `${t.roster.length}/${TOTAL_SLOTS}`);
     r.children[4].firstChild.style.width = t.budget + '%';
   });
+  if (!$('#tview').hidden) tvPaint(false);
 }
+// elenco de qualquer time durante o leilão
+const TV = { id: -1, key: '' };
+function tvPaint(force) {
+  const T = G.teams.find(x => x.id === TV.id); if (!T) return;
+  const key = T.id + ':' + T.roster.map(p => p.id).join(',') + ':' + T.budget + ':' + LANG;
+  if (!force && key === TV.key) return; TV.key = key;
+  const rows = lineupRows(T.roster), off = rows.filter(r => OFF_POS.includes(r.pos)), def = rows.filter(r => !OFF_POS.includes(r.pos));
+  $('#tv-h').textContent = T.name + (T.human ? ' (' + tt('você') + ')' : '');
+  const st = tt('{n}/16 titulares · sobram {b}', { n: T.roster.length, b: dollars(T.budget) });
+  $('#tv-b').innerHTML = `<div class="tvh">${badge(T.emb, 40)}<small>${esc(st)}</small></div><div class="lu"><div><div class="sub" style="margin-top:0">${tt('ATAQUE')}</div>${off.map(r => slotHTML(r)).join('')}</div><div><div class="sub">${tt('DEFESA')}</div>${def.map(r => slotHTML(r)).join('')}</div></div>`;
+}
+function tvOpen(id) { TV.id = id; TV.key = ''; tvPaint(true); $('#tview').hidden = false; $('#tv-b').scrollTop = 0; }
+$('#table').addEventListener('click', e => { const r = e.target.closest('.trow[data-t]'); if (r) tvOpen(+r.dataset.t); });
+$('#table').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.trow[data-t]')) { e.preventDefault(); tvOpen(+e.target.dataset.t); } });
+$('#tview').addEventListener('click', e => { if (e.target.closest('[data-close]')) $('#tview').hidden = true; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#tview').hidden = true; });
+// voltar pro início no meio do leilão
+$('#a-back').onclick = () => {
+  const ok = window.confirm(G.mp ? t('Sair do leilão? Um bot joga no seu lugar e você pode voltar pelo código da sala.') : t('Sair do leilão? O progresso desse leilão se perde.'));
+  if (!ok) return;
+  $('#tview').hidden = true; cancelAnimationFrame(G.raf); show('setup');
+};
 function paintMarket() {
   return;
   const A = G.A, cur = A.phase === 'bidding' || A.phase === 'sold' ? A.cur : null;
@@ -754,7 +779,7 @@ $('#go-cup').onclick = () => { show('cup'); cupRun(true); };
 $('#cup-back').onclick = () => { svStop(); SV.el = null; show('setup'); };
 $('#cup-new').onclick = () => { cupRun(true); window.scrollTo(0, 0); };
 $('#cup-again').onclick = () => { cupRun(false); window.scrollTo(0, 0); };
-$('#again').onclick = () => { openLobby(false); };
+$('#again').onclick = () => { if (G.mp) { mpLeave(); onOpen(); return; } openLobby(false); };
 
 // ----- partida -----
 const pct = x => Math.round(x * 100) + '%';
