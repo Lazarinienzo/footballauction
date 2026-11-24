@@ -1,4 +1,4 @@
-# Football Auction
+# Touchdown Auction
 
 Leilão de jogadores da NFL com temporada simulada. Online com salas privadas e públicas.
 

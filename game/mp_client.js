@@ -118,7 +118,7 @@ function mpName() { clearTimeout(MP.nameT); MP.nameT = setTimeout(() => mpSend({
 async function mpCopy() {
   const url = `${location.origin}/?sala=${MP.code}`;
   try { await navigator.clipboard.writeText(url); }
-  catch (e) { if (navigator.share) { try { await navigator.share({ title: 'Football Auction', url }); } catch (x) { } return; } window.prompt(t('Copie o link:'), url); return; }
+  catch (e) { if (navigator.share) { try { await navigator.share({ title: 'Touchdown Auction', url }); } catch (x) { } return; } window.prompt(t('Copie o link:'), url); return; }
   clearTimeout(MP.copyT); MP.copyT = setTimeout(() => { MP.copyT = 0; if (vis('lobby')) lobbyMode(); }, 1600); lobbyMode();
 }
 $('#lb-copy').onclick = mpCopy;

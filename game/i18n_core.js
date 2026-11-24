@@ -23,7 +23,7 @@ function applyStatic() {
     if (s.n) s.n.nodeValue = s.pt.replace(core, () => tr); else s.el.setAttribute(s.a, tr);
   }
   document.documentElement.lang = LANG === 'pt' ? 'pt-BR' : LANG;
-  document.title = t('Football Auction');
+  document.title = t('Touchdown Auction');
 }
 function langBar() {
   return `<div class="lang" role="group" aria-label="Idioma">${LANGS.map(l => `<button type="button" data-lang="${l}" class="${l === LANG ? 'on' : ''}" aria-pressed="${l === LANG}">${l.toUpperCase()}</button>`).join('')}</div>`;

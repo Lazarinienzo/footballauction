@@ -838,7 +838,7 @@ async function teamCardURL(t, info) {
   const fit = (txt, maxW) => { if (c.measureText(txt).width <= maxW) return txt; while (txt.length > 1 && c.measureText(txt + '…').width > maxW) txt = txt.slice(0, -1); return txt + '…'; };
   const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0c2f7c'); g.addColorStop(.38, '#071a45'); g.addColorStop(.75, '#020817'); g.addColorStop(1, '#000'); c.fillStyle = g; c.fillRect(0, 0, W, H);
   c.textBaseline = 'alphabetic'; c.textAlign = 'left';
-  c.fillStyle = '#f6d64a'; c.font = B(800, 26); if ('letterSpacing' in c) c.letterSpacing = '5px'; c.fillText('FOOTBALL AUCTION', 60, 70); if ('letterSpacing' in c) c.letterSpacing = '0px';
+  c.fillStyle = '#f6d64a'; c.font = B(800, 26); if ('letterSpacing' in c) c.letterSpacing = '5px'; c.fillText('TOUCHDOWN AUCTION', 60, 70); if ('letterSpacing' in c) c.letterSpacing = '0px';
   const em = EMB[t.emb] || EMB[0], img = await emblemImg(t.emb, 96);
   c.fillStyle = em[1] + '30'; rr(60, 100, 118, 118, 38); c.fill(); c.strokeStyle = em[1] + '99'; c.lineWidth = 3; rr(60, 100, 118, 118, 38); c.stroke();
   if (img) c.drawImage(img, 71, 111, 96, 96);
@@ -871,7 +871,7 @@ async function teamCardURL(t, info) {
     }
   };
   field('off', 376); field('def', 876);
-  c.fillStyle = 'rgba(255,255,255,.55)'; c.font = B(600, 24); c.textAlign = 'center'; c.fillText(tt('Monte o seu time no Football Auction'), W / 2, 1416); c.textAlign = 'left';
+  c.fillStyle = 'rgba(255,255,255,.55)'; c.font = B(600, 24); c.textAlign = 'center'; c.fillText(tt('Monte o seu time no Touchdown Auction'), W / 2, 1416); c.textAlign = 'left';
   return cv.toDataURL('image/png');
 }
 async function openShare(tm, info) {
@@ -885,12 +885,12 @@ $('#shr').addEventListener('click', async e => {
   if (!SHR.url) return;
   if (e.target.closest('#shr-dl')) {
     let dl = null; try { dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch (err) { dl = null; }
-    if (dl) { try { await dl.save({ filename: 'meu-time-football-auction.png', data: dataBlob(SHR.url) }); } catch (err) { if (err && err.code === 'host_unavailable') $('#shr-note').textContent = t('Este app não salva arquivos. Abra no navegador ou segure na imagem.'); } }
-    else { const a = document.createElement('a'); a.href = URL.createObjectURL(dataBlob(SHR.url)); a.download = 'meu-time-football-auction.png'; document.body.appendChild(a); a.click(); a.remove(); }
+    if (dl) { try { await dl.save({ filename: 'meu-time-touchdown-auction.png', data: dataBlob(SHR.url) }); } catch (err) { if (err && err.code === 'host_unavailable') $('#shr-note').textContent = t('Este app não salva arquivos. Abra no navegador ou segure na imagem.'); } }
+    else { const a = document.createElement('a'); a.href = URL.createObjectURL(dataBlob(SHR.url)); a.download = 'meu-time-touchdown-auction.png'; document.body.appendChild(a); a.click(); a.remove(); }
   }
   else if (e.target.closest('#shr-share')) {
-    try { const f = new File([dataBlob(SHR.url)], 'meu-time-football-auction.png', { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f], title: t('Meu time no Football Auction') }); else $('#shr-note').textContent = t('Este navegador não compartilha direto. Segure na imagem pra salvar.'); }
+    try { const f = new File([dataBlob(SHR.url)], 'meu-time-touchdown-auction.png', { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f], title: t('Meu time no Touchdown Auction') }); else $('#shr-note').textContent = t('Este navegador não compartilha direto. Segure na imagem pra salvar.'); }
     catch (err) { if (err && err.name !== 'AbortError') $('#shr-note').textContent = t('O compartilhamento não abriu aqui. Segure na imagem pra salvar.'); }
   }
 });

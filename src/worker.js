@@ -1,4 +1,4 @@
-// Football Auction online: Worker (rotas) + Durable Objects (Room = uma sala, Lobby = lista de salas públicas)
+// Touchdown Auction online: Worker (rotas) + Durable Objects (Room = uma sala, Lobby = lista de salas públicas)
 import { Room } from './room.js';
 import { Lobby } from './lobby.js';
 export { Room, Lobby };

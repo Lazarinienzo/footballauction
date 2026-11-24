@@ -1,4 +1,4 @@
-// Uma sala do Football Auction. O leilão roda aqui (servidor manda), os clientes só mostram e mandam lance/passar.
+// Uma sala do Touchdown Auction. O leilão roda aqui (servidor manda), os clientes só mostram e mandam lance/passar.
 import { DurableObject } from 'cloudflare:workers';
 import { DB, BUDGET, Auction, newBot, finishTeam, MIN_TEAMS } from './engine.js';
 
