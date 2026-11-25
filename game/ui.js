@@ -374,25 +374,26 @@ themeSync();
 // ----- sons (WebAudio, sem arquivos): "up" curtinho a cada lance -----
 const sfx = {
   on: (() => { try { return localStorage.getItem('fa-snd') !== '0'; } catch (e) { return true; } })(), ctx: null,
-  unlock() { if (!sfx.ctx) { try { sfx.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; } } if (sfx.ctx.state === 'suspended') sfx.ctx.resume(); },
+  unlock() { if (!sfx.ctx) { try { sfx.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; } } if (sfx.ctx.state === 'suspended') sfx.ctx.resume(); try { const c = sfx.ctx, b = c.createBuffer(1, 1, 22050), n = c.createBufferSource(); n.buffer = b; n.connect(c.destination); n.start(0); } catch (e) { } },
   up(mine) {
-    if (!sfx.on || !sfx.ctx || sfx.ctx.state !== 'running') return;
+    if (!sfx.on || !sfx.ctx) return; if (sfx.ctx.state !== 'running') { sfx.ctx.resume().catch(() => { }); return; }
     const nw = performance.now(); if (nw - (sfx.last || 0) < 110) return; sfx.last = nw;
-    const c = sfx.ctx, t0 = c.currentTime, f = mine ? [620, 930] : [440, 560], v = mine ? .16 : .07;
+    const c = sfx.ctx, t0 = c.currentTime, f = mine ? [620, 930] : [440, 560], v = mine ? .3 : .14;
     const o = c.createOscillator(), g = c.createGain(); o.type = 'triangle';
     o.frequency.setValueAtTime(f[0], t0); o.frequency.setValueAtTime(f[1], t0 + .07);
     g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(v, t0 + .015); g.gain.exponentialRampToValueAtTime(.001, t0 + .22);
     o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + .24);
   },
   tick(n) {                                              // tique do relógio a cada segundo
-    if (!sfx.on || !sfx.ctx || sfx.ctx.state !== 'running') return;
-    const c = sfx.ctx, t0 = c.currentTime, o = c.createOscillator(), g = c.createGain(); o.type = 'square';
-    o.frequency.value = n <= 1 ? 1500 : n <= 3 ? 1050 : 800; g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(n <= 1 ? .07 : n <= 3 ? .05 : .035, t0 + .005); g.gain.exponentialRampToValueAtTime(.001, t0 + .09);
-    o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + .1);
+    if (!sfx.on || !sfx.ctx) return; if (sfx.ctx.state !== 'running') { sfx.ctx.resume().catch(() => { }); return; }
+    const c = sfx.ctx, t0 = c.currentTime, o = c.createOscillator(), g = c.createGain(); o.type = 'triangle';
+    o.frequency.value = n <= 1 ? 1500 : n <= 3 ? 1100 : 880; g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(n <= 1 ? .5 : n <= 3 ? .38 : .28, t0 + .006); g.gain.exponentialRampToValueAtTime(.001, t0 + .14);
+    o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + .16);
   },
   paint() { const b = $('#a-snd'); if (b) { b.classList.toggle('off', !sfx.on); b.setAttribute('aria-pressed', String(sfx.on)); b.setAttribute('aria-label', t(sfx.on ? 'Som ligado' : 'Som desligado')); } }
 };
-document.addEventListener('pointerdown', sfx.unlock); document.addEventListener('keydown', sfx.unlock);
+['pointerup', 'touchend', 'click', 'keydown'].forEach(ev => document.addEventListener(ev, sfx.unlock, { passive: true }));   // no celular só pointerup/touchend/click contam como toque pra liberar o áudio
+document.addEventListener('visibilitychange', () => { if (!document.hidden && sfx.ctx && sfx.ctx.state !== 'running') sfx.ctx.resume().catch(() => { }); });
 $('#a-snd').onclick = () => { sfx.on = !sfx.on; try { localStorage.setItem('fa-snd', sfx.on ? '1' : '0'); } catch (e) { } sfx.paint(); if (sfx.on) sfx.up(true); };
 sfx.paint();
 
