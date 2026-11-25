@@ -55,7 +55,7 @@ const NFL = ['Buffalo Bills','Miami Dolphins','New England Patriots','New York J
 const frName = p => NFL[frIdx(p)];
 // logos oficiais: só os times que têm arquivo em public/logos/<sigla>.webp. Pra desligar tudo, USE_LOGOS = false
 const USE_LOGOS = true;
-const LOGO_OK = new Set(['den', 'ari', 'lar', 'sea', 'sf', 'no', 'atl', 'tb', 'car', 'gb', 'min', 'chi', 'det', 'phi', 'was', 'dal', 'nyg', 'lac', 'lv', 'kc']);
+const LOGO_OK = new Set(TEAM_CODES.map(c => c.toLowerCase())); // os 32 times têm arquivo em public/logos
 const logoSrc = i => { const c = (TEAM_CODES[i] || '').toLowerCase(); return USE_LOGOS && LOGO_OK.has(c) ? `/logos/${c}.webp?v=1` : null; };
 const badge = (i, px) => { const e = EMB[i] || EMB[0], j = EMB.indexOf(e), lg = logoSrc(j);
   if (lg) return `<span class="emb logo" style="--c:${e[1]};--s:${px || 32}px"><img src="${lg}" alt="${emN(j)}" width="${px || 32}" height="${px || 32}" decoding="async" draggable="false"></span>`;
