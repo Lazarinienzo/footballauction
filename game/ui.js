@@ -558,17 +558,15 @@ const POSINFO = {
 };
 function fieldHTML(side, rows, o) {
   const by = {}; rows.forEach(r => (by[r.pos] = by[r.pos] || []).push(r));
-  const tk = (pos, i, r, c) => {
-    const x = by[pos][i], want = o.cur && !x.p && o.cur.pos === pos, isNew = o.newId != null && x.p && x.p.id === o.newId;
-    const lk = x.p && o.linked && o.linked.has(x.p.id);
-    return `<div class="tk ${side} ${x.p ? '' : 'empty'} ${want ? 'want' : ''} ${isNew ? 'new' : ''} ${lk ? 'lk' : ''}" data-id="${x.p ? x.p.id : ''}" style="--r:${r};--c:${c}${lk ? ';--tc:' + EMB[frIdx(x.p)][1] : ''}"><span class="c num">${x.p ? x.p.ovr : '+'}${WEIGHT[pos] > 1 ? `<i class="w">${nf(WEIGHT[pos])}x</i>` : ''}</span><b>${pos}</b><small>${x.p ? esc(shortName(x.p.name)) : ''}</small></div>`;
-  };
-  const cells = side === 'off'
-    ? [tk('WR', 0, 1, 1), tk('OL', 0, 1, 2), tk('OL', 1, 1, 3), tk('OL', 2, 1, 4), tk('TE', 0, 1, 5), tk('WR', 1, 1, 6), tk('QB', 0, 2, 4), tk('RB', 0, 3, 4)]
-    : [tk('CB', 0, 1, 1), tk('CB', 1, 1, 6), tk('LB', 0, 2, 3), tk('LB', 1, 2, 4), tk('EDGE', 0, 3, 2), tk('DT', 0, 3, 3), tk('DT', 1, 3, 4), tk('EDGE', 1, 3, 5)];
+  const sp = SPOT[side], xs = sp.map(q => q[2]), x0 = Math.min(...xs), span = Math.max(...xs) - x0 + 1.2, rowsN = Math.max(...sp.map(q => q[3])) + 1;
+  const cells = sp.map(([pos, i, x, y]) => {
+    const r = by[pos][i], want = o.cur && !r.p && o.cur.pos === pos, isNew = o.newId != null && r.p && r.p.id === o.newId, lk = r.p && o.linked && o.linked.has(r.p.id);
+    const logo = r.p ? badge(frIdx(r.p), 34) : '<span class="plus">+</span>';
+    return `<div class="tk ${side} ${r.p ? '' : 'empty'} ${want ? 'want' : ''} ${isNew ? 'new' : ''} ${lk ? 'lk' : ''}" data-id="${r.p ? r.p.id : ''}" style="left:${(x - x0 + .6) / span * 100}%;top:calc(${y} * var(--rh));width:${100 / span}%${lk ? ';--tc:' + EMB[frIdx(r.p)][1] : ''}"><div class="r"><span class="c">${logo}</span><span class="ov num">${r.p ? r.p.ovr : ''}</span></div><small>${r.p ? esc(shortName(r.p.name)) : ''}</small><b>${pos}${WEIGHT[pos] > 1 ? `<em>${nf(WEIGHT[pos])}x</em>` : ''}</b></div>`;
+  });
   const got = rows.filter(r => r.p).length;
   const sy = o.syn && o.syn[side] ? `<span class="sy">${t('Sinergia')} +${nf(o.syn[side].toFixed(1))}</span>` : '', up = o.up && o.up[side] ? `<span class="sy up">${t('Esse lote liga com seu time')}</span>` : '';
-  return `<div class="fld"><div class="fh"><span>${t(side === 'off' ? 'ATAQUE' : 'DEFESA')} ${sy}</span>${up}<span class="num">${got}/8</span></div><div class="fg">${cells.join('')}<i class="los" style="grid-row:${side === 'off' ? 2 : 3}"></i></div></div>`;
+  return `<div class="fld"><div class="fh"><span>${t(side === 'off' ? 'ATAQUE' : 'DEFESA')} ${sy}</span>${up}<span class="num">${got}/8</span></div><div class="fg" style="--rows:${rowsN}">${cells.join('')}</div></div>`;
 }
 // linhas de sinergia estilo FIFA: ligam os titulares do mesmo time da NFL, na cor do time
 function drawLinks(links) {
@@ -601,7 +599,7 @@ function paintLineup() {
 }
 function openPosInfo() {
   const row = s => ([p, n, q, d]) => `<div class="pi"><span class="pos ${s}">${p}</span><div><b>${n}<em>${tpl('{n} vaga', '{n} vagas', q)} · ${nf(WEIGHT[p].toFixed(2).replace(/0$/, ''))}x</em></b><p>${t(d)}</p></div></div>`;
-  $('#posinfo-b').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE · tem a bola')}</div>${POSINFO.off.map(row('off')).join('')}<div class="sub">${t('DEFESA · tenta tomar a bola')}</div>${POSINFO.def.map(row('def')).join('')}<p class="sh-n">${t('O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR, LB e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.')}</p><p class="sh-n">${t('Sinergia: dois titulares do mesmo lado e do mesmo time da NFL ganham uma linha na cor do time e somam pontos no OVR (QB + WR = +1,0; RB + QB ≈ +0,9; linha com linha = +0,5), até +4 por lado.')}</p>`;
+  $('#posinfo-b').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE · tem a bola')}</div>${POSINFO.off.map(row('off')).join('')}<div class="sub">${t('DEFESA · tenta tomar a bola')}</div>${POSINFO.def.map(row('def')).join('')}<p class="sh-n">${t('O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR, LB e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.')}</p><p class="sh-n">${t('Sinergia: dois titulares do mesmo time da NFL, do mesmo lado e lado a lado no campo ganham uma linha na cor do time e somam pontos no OVR (QB + WR = +1,0; RB + QB ≈ +0,9; linha com linha = +0,5), até +4 por lado. Quem está longe um do outro não se conecta.')}</p>`;
   $('#posinfo').hidden = false; $('#posinfo-b').scrollTop = 0;
 }
 $('#pos-info').onclick = openPosInfo;

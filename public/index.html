@@ -462,20 +462,22 @@ html,body{overflow-x:hidden}
 .fld{position:relative;border-radius:16px;padding:12px 6px 10px;margin-top:8px;overflow:hidden;background:#0c2a30 linear-gradient(180deg,rgba(40,150,96,.28),rgba(22,96,70,.2));border:1px solid rgba(120,220,170,.22);
   background-image:repeating-linear-gradient(180deg,transparent 0,transparent 33px,rgba(255,255,255,.07) 33px,rgba(255,255,255,.07) 34px),linear-gradient(180deg,rgba(40,150,96,.20),rgba(22,96,70,.14))}
 .fld .fh{display:flex;justify-content:space-between;font-size:11px;font-weight:700;letter-spacing:.12em;color:rgba(255,255,255,.62);padding:0 8px 6px}
-.fld .fg{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px 2px;position:relative}
-.fld .los{grid-column:1/-1;align-self:start;height:0;margin:-4px 0 0;border-top:2px dashed rgba(246,214,74,.55);pointer-events:none}
-.fld .tk{grid-row:var(--r);grid-column:var(--c);display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;padding:0}
-.tk .c{width:min(42px,88%);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:16px;letter-spacing:-.03em;color:#fff;background:#1c47a8;border:2px solid #7fa8ff;box-shadow:0 3px 10px rgba(0,0,0,.35)}
-.fld .tk{position:relative;z-index:1}
+.fld .fg{--rh:74px;position:relative;height:calc(var(--rows) * var(--rh) + 4px)}
+.fld .tk{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0;padding:0}
+.tk .r{display:flex;align-items:center;gap:3px;max-width:100%}
+.tk .ov{font-family:var(--display);font-weight:800;font-size:15px;line-height:1;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.tk b em{font-style:normal;font-weight:700;color:var(--hi);margin-left:3px;letter-spacing:0}
+.tk .plus{font-size:15px}
+.fld .tk{z-index:1}
 .fld svg.lk{position:absolute;left:0;top:0;pointer-events:none;z-index:0;overflow:visible}
-.tk.lk .c{border-color:var(--tc);box-shadow:0 0 0 2px var(--tc),0 3px 10px rgba(0,0,0,.35)}
+.tk.lk .c{outline:3px solid var(--tc);outline-offset:1px}
 .fld .sy{margin-left:6px;font-size:10px;font-weight:800;letter-spacing:.04em;color:#7ff0b0}
 .fld .sy.up{color:var(--hi);animation:tkp 1.1s ease-in-out infinite alternate}
-.tk.def .c{background:#a83a30;border-color:#ff9a8c}
-.tk.empty .c{background:rgba(3,10,28,.45);border:2px dashed rgba(255,255,255,.4);color:rgba(255,255,255,.45);font-size:13px;box-shadow:none}
+.tk .c{position:relative;flex:none;width:34px;height:34px;border-radius:32%;display:grid;place-items:center;box-shadow:0 3px 10px rgba(0,0,0,.4);outline:2px solid rgba(255,255,255,.35);outline-offset:1px;color:rgba(255,255,255,.5)}
+.tk.empty .c{background:rgba(3,10,28,.45);outline:2px dashed rgba(255,255,255,.4);box-shadow:none}
 .tk b{font-size:10px;font-weight:800;letter-spacing:.06em;color:#fff}
 .tk small{display:block;max-width:100%;font-size:9.5px;line-height:1.1;color:rgba(255,255,255,.72);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:11px}
-.tk.want .c{border-color:var(--hi);box-shadow:0 0 0 4px rgba(246,214,74,.28);animation:tkp 1.1s ease-in-out infinite alternate}
+.tk.want .c{outline:2px solid var(--hi);box-shadow:0 0 0 4px rgba(246,214,74,.28);animation:tkp 1.1s ease-in-out infinite alternate}
 .tk.new .c{animation:tkn 1.4s ease-out}
 @keyframes tkp{to{box-shadow:0 0 0 8px rgba(246,214,74,.08)}}
 @keyframes tkn{0%{transform:scale(1.5);box-shadow:0 0 0 8px rgba(95,227,154,.55)}100%{transform:scale(1)}}
@@ -495,7 +497,6 @@ html,body{overflow-x:hidden}
 .pi .pos{min-width:0;width:58px;align-self:start}
 .sh-n{margin:14px 0 0;font-size:13px;color:var(--mute)}
 
-.tk .c{position:relative}.tk .c .w{position:absolute;top:-6px;right:-8px;font-style:normal;font-family:var(--body);font-weight:800;font-size:9px;letter-spacing:0;line-height:1;padding:2px 4px;border-radius:999px;background:var(--flag);color:var(--flag-ink)}
 
 /* destaques da temporada e cartão */
 .mvp small{font-size:12px;font-weight:700;letter-spacing:.12em;color:var(--hi)}
@@ -1001,19 +1002,25 @@ function lineup(roster) {
 }
 // Peso de cada posição no OVR do time. A base é 1,0x; a média é sempre dividida pela soma dos pesos, então a escala do OVR não muda.
 const WEIGHT = { QB: 2.5, RB: 1.0, WR: 1.5, TE: 1.0, OL: 1.0, EDGE: 2.0, DT: 1.0, LB: 1.5, CB: 1.5 };   // base 1,0x; degraus 1,5x e 2,0x; o QB vale 2,5x
-// Titulares de cada lado, com o peso da posição.
+// Posições no campo (x, y em "casas"): o desenho da tela e as sinergias usam as MESMAS coordenadas.
+// [posição, índice (0 = melhor OVR da posição), x, y]
+const SPOT = {
+  off: [['OL', 0, 1.5, 0], ['OL', 1, 2.5, 0], ['OL', 2, 3.5, 0], ['TE', 0, 4.5, 0], ['WR', 0, 1, 1], ['QB', 0, 2.5, 1], ['WR', 1, 4, 1], ['RB', 0, 2.5, 2]],
+  def: [['CB', 0, 1, 0], ['CB', 1, 4, 0], ['LB', 0, 2, 1], ['LB', 1, 3, 1], ['EDGE', 0, 1, 2], ['DT', 0, 2, 2], ['DT', 1, 3, 2], ['EDGE', 1, 4, 2]]
+};
+const SYN_DIST = 1.6;   // só jogadores vizinhos no campo se conectam
+// Titulares de cada lado, com o peso e o lugar da posição.
 function sideStarters(L, side) {
-  const o = [['QB', L.QB], ['RB', L.RB], ['WR', L.WR[0]], ['WR', L.WR[1]], ['TE', L.TE], ['OL', L.OL[0]], ['OL', L.OL[1]], ['OL', L.OL[2]]];
-  const d = [['EDGE', L.EDGE[0]], ['EDGE', L.EDGE[1]], ['DT', L.DT[0]], ['DT', L.DT[1]], ['LB', L.LB[0]], ['LB', L.LB[1]], ['CB', L.CB[0]], ['CB', L.CB[1]]];
-  return (side === 'off' ? o : d).map(([pos, p]) => ({ pos, p, w: WEIGHT[pos] }));
+  return SPOT[side].map(([pos, i, x, y]) => ({ pos, i, x, y, p: Array.isArray(L[pos]) ? L[pos][i] : L[pos], w: WEIGHT[pos] }));
 }
-// SINERGIA: dois titulares do MESMO lado (ataque com ataque, defesa com defesa) do mesmo time da NFL formam um link.
-// Cada link soma SYN pontos de OVR por peso das duas posições (QB+WR = 1,0 pt; RB+QB ≈ 0,9; OL+OL = 0,5), com teto por lado.
+// SINERGIA: dois titulares do MESMO lado, do mesmo time da NFL e VIZINHOS no campo formam um link.
+// Cada link soma SYN pontos de OVR por peso das duas posições (QB+WR = +1,0; RB+QB ≈ +0,9; OL+OL = +0,5), com teto por lado.
 const SYN = 0.25, SYN_CAP = 4;
 function synLinks(L, side) {
   const xs = sideStarters(L, side).filter(x => x.p && x.p.tm), out = [];
   for (let i = 0; i < xs.length; i++) for (let j = i + 1; j < xs.length; j++)
-    if (xs[i].p.tm === xs[j].p.tm) out.push({ a: xs[i].p, b: xs[j].p, pa: xs[i].pos, pb: xs[j].pos, tm: xs[i].p.tm, pts: SYN * (xs[i].w + xs[j].w) });
+    if (xs[i].p.tm === xs[j].p.tm && Math.hypot(xs[i].x - xs[j].x, xs[i].y - xs[j].y) <= SYN_DIST)
+      out.push({ a: xs[i].p, b: xs[j].p, pa: xs[i].pos, pb: xs[j].pos, tm: xs[i].p.tm, pts: SYN * (xs[i].w + xs[j].w) });
   return out;
 }
 const synPts = links => Math.min(SYN_CAP, links.reduce((n, l) => n + l.pts, 0));
@@ -1366,7 +1373,7 @@ function simSeason(teams, confs) {
   return { confs, table, games, rounds, champion, finalists: champs.length > 1 ? [x, y] : [champs[0]] };
 }
 
-if (typeof module !== 'undefined') module.exports = { SYN, SYN_CAP, synLinks, synPts, sideStarters, WEIGHT, SIM, POSSESSIONS, pTD, pFG, driveOdds, TAKE, SLOTS, POS_ORDER, OFF_POS, TOTAL_SLOTS, BUDGET, lineup, ratings, simGame, Auction, newBot, maxTeams, makePool, finishTeam, simSeason, drawConferences, buildTables, makeRounds, confName, qualifiers, MIN_TEAMS, MAX_CONF, need, slotsLeft, maxBid, duel, shortName, withSeed, mulberry32, rint, R };
+if (typeof module !== 'undefined') module.exports = { SPOT, SYN, SYN_CAP, synLinks, synPts, sideStarters, WEIGHT, SIM, POSSESSIONS, pTD, pFG, driveOdds, TAKE, SLOTS, POS_ORDER, OFF_POS, TOTAL_SLOTS, BUDGET, lineup, ratings, simGame, Auction, newBot, maxTeams, makePool, finishTeam, simSeason, drawConferences, buildTables, makeRounds, confName, qualifiers, MIN_TEAMS, MAX_CONF, need, slotsLeft, maxBid, duel, shortName, withSeed, mulberry32, rint, R };
 
 </script>
 <script>
@@ -1624,7 +1631,7 @@ I18N.en = {
 "Cobrem os receptores. Tentam derrubar ou interceptar o passe e não deixam o WR escapar.": "Cover the receivers. Try to knock down or intercept the pass and keep the WR from getting away.",
 "Sinergia": "Synergy",
 "Esse lote liga com seu time": "Links with your team",
-"Sinergia: dois titulares do mesmo lado e do mesmo time da NFL ganham uma linha na cor do time e somam pontos no OVR (QB + WR = +1,0; RB + QB ≈ +0,9; linha com linha = +0,5), até +4 por lado.": "Synergy: two starters on the same side from the same NFL team get a line in the team colour and add OVR points (QB + WR = +1.0; RB + QB ≈ +0.9; lineman + lineman = +0.5), up to +4 per side.",
+"Sinergia: dois titulares do mesmo time da NFL, do mesmo lado e lado a lado no campo ganham uma linha na cor do time e somam pontos no OVR (QB + WR = +1,0; RB + QB ≈ +0,9; linha com linha = +0,5), até +4 por lado. Quem está longe um do outro não se conecta.": "Synergy: two starters from the same NFL team, on the same side and next to each other on the field, get a line in the team colour and add OVR points (QB + WR = +1.0; RB + QB ≈ +0.9; lineman + lineman = +0.5), up to +4 per side. Players far apart don't connect.",
 "ATAQUE · tem a bola": "OFFENSE · has the ball",
 "DEFESA · tenta tomar a bola": "DEFENSE · tries to take the ball",
 "O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR, LB e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.": "Offense OVR is the weighted average of the 8 offensive starters, and defense OVR is the weighted average of the 8 defensive ones. The base is 1.0x. WR, LB and CB go up to 1.5x. EDGE counts 2.0x and the QB counts 2.5x. In other words, a 90 QB weighs two and a half times a 90 lineman.",
@@ -2350,17 +2357,15 @@ const POSINFO = {
 };
 function fieldHTML(side, rows, o) {
   const by = {}; rows.forEach(r => (by[r.pos] = by[r.pos] || []).push(r));
-  const tk = (pos, i, r, c) => {
-    const x = by[pos][i], want = o.cur && !x.p && o.cur.pos === pos, isNew = o.newId != null && x.p && x.p.id === o.newId;
-    const lk = x.p && o.linked && o.linked.has(x.p.id);
-    return `<div class="tk ${side} ${x.p ? '' : 'empty'} ${want ? 'want' : ''} ${isNew ? 'new' : ''} ${lk ? 'lk' : ''}" data-id="${x.p ? x.p.id : ''}" style="--r:${r};--c:${c}${lk ? ';--tc:' + EMB[frIdx(x.p)][1] : ''}"><span class="c num">${x.p ? x.p.ovr : '+'}${WEIGHT[pos] > 1 ? `<i class="w">${nf(WEIGHT[pos])}x</i>` : ''}</span><b>${pos}</b><small>${x.p ? esc(shortName(x.p.name)) : ''}</small></div>`;
-  };
-  const cells = side === 'off'
-    ? [tk('WR', 0, 1, 1), tk('OL', 0, 1, 2), tk('OL', 1, 1, 3), tk('OL', 2, 1, 4), tk('TE', 0, 1, 5), tk('WR', 1, 1, 6), tk('QB', 0, 2, 4), tk('RB', 0, 3, 4)]
-    : [tk('CB', 0, 1, 1), tk('CB', 1, 1, 6), tk('LB', 0, 2, 3), tk('LB', 1, 2, 4), tk('EDGE', 0, 3, 2), tk('DT', 0, 3, 3), tk('DT', 1, 3, 4), tk('EDGE', 1, 3, 5)];
+  const sp = SPOT[side], xs = sp.map(q => q[2]), x0 = Math.min(...xs), span = Math.max(...xs) - x0 + 1.2, rowsN = Math.max(...sp.map(q => q[3])) + 1;
+  const cells = sp.map(([pos, i, x, y]) => {
+    const r = by[pos][i], want = o.cur && !r.p && o.cur.pos === pos, isNew = o.newId != null && r.p && r.p.id === o.newId, lk = r.p && o.linked && o.linked.has(r.p.id);
+    const logo = r.p ? badge(frIdx(r.p), 34) : '<span class="plus">+</span>';
+    return `<div class="tk ${side} ${r.p ? '' : 'empty'} ${want ? 'want' : ''} ${isNew ? 'new' : ''} ${lk ? 'lk' : ''}" data-id="${r.p ? r.p.id : ''}" style="left:${(x - x0 + .6) / span * 100}%;top:calc(${y} * var(--rh));width:${100 / span}%${lk ? ';--tc:' + EMB[frIdx(r.p)][1] : ''}"><div class="r"><span class="c">${logo}</span><span class="ov num">${r.p ? r.p.ovr : ''}</span></div><small>${r.p ? esc(shortName(r.p.name)) : ''}</small><b>${pos}${WEIGHT[pos] > 1 ? `<em>${nf(WEIGHT[pos])}x</em>` : ''}</b></div>`;
+  });
   const got = rows.filter(r => r.p).length;
   const sy = o.syn && o.syn[side] ? `<span class="sy">${t('Sinergia')} +${nf(o.syn[side].toFixed(1))}</span>` : '', up = o.up && o.up[side] ? `<span class="sy up">${t('Esse lote liga com seu time')}</span>` : '';
-  return `<div class="fld"><div class="fh"><span>${t(side === 'off' ? 'ATAQUE' : 'DEFESA')} ${sy}</span>${up}<span class="num">${got}/8</span></div><div class="fg">${cells.join('')}<i class="los" style="grid-row:${side === 'off' ? 2 : 3}"></i></div></div>`;
+  return `<div class="fld"><div class="fh"><span>${t(side === 'off' ? 'ATAQUE' : 'DEFESA')} ${sy}</span>${up}<span class="num">${got}/8</span></div><div class="fg" style="--rows:${rowsN}">${cells.join('')}</div></div>`;
 }
 // linhas de sinergia estilo FIFA: ligam os titulares do mesmo time da NFL, na cor do time
 function drawLinks(links) {
@@ -2393,7 +2398,7 @@ function paintLineup() {
 }
 function openPosInfo() {
   const row = s => ([p, n, q, d]) => `<div class="pi"><span class="pos ${s}">${p}</span><div><b>${n}<em>${tpl('{n} vaga', '{n} vagas', q)} · ${nf(WEIGHT[p].toFixed(2).replace(/0$/, ''))}x</em></b><p>${t(d)}</p></div></div>`;
-  $('#posinfo-b').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE · tem a bola')}</div>${POSINFO.off.map(row('off')).join('')}<div class="sub">${t('DEFESA · tenta tomar a bola')}</div>${POSINFO.def.map(row('def')).join('')}<p class="sh-n">${t('O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR, LB e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.')}</p><p class="sh-n">${t('Sinergia: dois titulares do mesmo lado e do mesmo time da NFL ganham uma linha na cor do time e somam pontos no OVR (QB + WR = +1,0; RB + QB ≈ +0,9; linha com linha = +0,5), até +4 por lado.')}</p>`;
+  $('#posinfo-b').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE · tem a bola')}</div>${POSINFO.off.map(row('off')).join('')}<div class="sub">${t('DEFESA · tenta tomar a bola')}</div>${POSINFO.def.map(row('def')).join('')}<p class="sh-n">${t('O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR, LB e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.')}</p><p class="sh-n">${t('Sinergia: dois titulares do mesmo time da NFL, do mesmo lado e lado a lado no campo ganham uma linha na cor do time e somam pontos no OVR (QB + WR = +1,0; RB + QB ≈ +0,9; linha com linha = +0,5), até +4 por lado. Quem está longe um do outro não se conecta.')}</p>`;
   $('#posinfo').hidden = false; $('#posinfo-b').scrollTop = 0;
 }
 $('#pos-info').onclick = openPosInfo;

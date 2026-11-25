@@ -43,19 +43,25 @@ function lineup(roster) {
 }
 // Peso de cada posição no OVR do time. A base é 1,0x; a média é sempre dividida pela soma dos pesos, então a escala do OVR não muda.
 const WEIGHT = { QB: 2.5, RB: 1.0, WR: 1.5, TE: 1.0, OL: 1.0, EDGE: 2.0, DT: 1.0, LB: 1.5, CB: 1.5 };   // base 1,0x; degraus 1,5x e 2,0x; o QB vale 2,5x
-// Titulares de cada lado, com o peso da posição.
+// Posições no campo (x, y em "casas"): o desenho da tela e as sinergias usam as MESMAS coordenadas.
+// [posição, índice (0 = melhor OVR da posição), x, y]
+const SPOT = {
+  off: [['OL', 0, 1.5, 0], ['OL', 1, 2.5, 0], ['OL', 2, 3.5, 0], ['TE', 0, 4.5, 0], ['WR', 0, 1, 1], ['QB', 0, 2.5, 1], ['WR', 1, 4, 1], ['RB', 0, 2.5, 2]],
+  def: [['CB', 0, 1, 0], ['CB', 1, 4, 0], ['LB', 0, 2, 1], ['LB', 1, 3, 1], ['EDGE', 0, 1, 2], ['DT', 0, 2, 2], ['DT', 1, 3, 2], ['EDGE', 1, 4, 2]]
+};
+const SYN_DIST = 1.6;   // só jogadores vizinhos no campo se conectam
+// Titulares de cada lado, com o peso e o lugar da posição.
 function sideStarters(L, side) {
-  const o = [['QB', L.QB], ['RB', L.RB], ['WR', L.WR[0]], ['WR', L.WR[1]], ['TE', L.TE], ['OL', L.OL[0]], ['OL', L.OL[1]], ['OL', L.OL[2]]];
-  const d = [['EDGE', L.EDGE[0]], ['EDGE', L.EDGE[1]], ['DT', L.DT[0]], ['DT', L.DT[1]], ['LB', L.LB[0]], ['LB', L.LB[1]], ['CB', L.CB[0]], ['CB', L.CB[1]]];
-  return (side === 'off' ? o : d).map(([pos, p]) => ({ pos, p, w: WEIGHT[pos] }));
+  return SPOT[side].map(([pos, i, x, y]) => ({ pos, i, x, y, p: Array.isArray(L[pos]) ? L[pos][i] : L[pos], w: WEIGHT[pos] }));
 }
-// SINERGIA: dois titulares do MESMO lado (ataque com ataque, defesa com defesa) do mesmo time da NFL formam um link.
-// Cada link soma SYN pontos de OVR por peso das duas posições (QB+WR = 1,0 pt; RB+QB ≈ 0,9; OL+OL = 0,5), com teto por lado.
+// SINERGIA: dois titulares do MESMO lado, do mesmo time da NFL e VIZINHOS no campo formam um link.
+// Cada link soma SYN pontos de OVR por peso das duas posições (QB+WR = +1,0; RB+QB ≈ +0,9; OL+OL = +0,5), com teto por lado.
 const SYN = 0.25, SYN_CAP = 4;
 function synLinks(L, side) {
   const xs = sideStarters(L, side).filter(x => x.p && x.p.tm), out = [];
   for (let i = 0; i < xs.length; i++) for (let j = i + 1; j < xs.length; j++)
-    if (xs[i].p.tm === xs[j].p.tm) out.push({ a: xs[i].p, b: xs[j].p, pa: xs[i].pos, pb: xs[j].pos, tm: xs[i].p.tm, pts: SYN * (xs[i].w + xs[j].w) });
+    if (xs[i].p.tm === xs[j].p.tm && Math.hypot(xs[i].x - xs[j].x, xs[i].y - xs[j].y) <= SYN_DIST)
+      out.push({ a: xs[i].p, b: xs[j].p, pa: xs[i].pos, pb: xs[j].pos, tm: xs[i].p.tm, pts: SYN * (xs[i].w + xs[j].w) });
   return out;
 }
 const synPts = links => Math.min(SYN_CAP, links.reduce((n, l) => n + l.pts, 0));
