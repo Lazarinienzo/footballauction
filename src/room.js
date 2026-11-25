@@ -1,6 +1,6 @@
 // Uma sala do Touchdown Auction. O leilão roda aqui (servidor manda), os clientes só mostram e mandam lance/passar.
 import { DurableObject } from 'cloudflare:workers';
-import { DB, BUDGET, Auction, newBot, finishTeam, MIN_TEAMS } from './engine.js';
+import { DB, BUDGET, Auction, newBot, finishTeam, MIN_TEAMS, POS_ORDER, SLOTS } from './engine.js';
 
 const MAX_SEATS = 8, EMB_N = 32, HOLD_MS = 3500, AWAY_BOT_MS = 12000, LOBBY_AWAY_MS = 25000;
 const clean = s => String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 44);
@@ -54,6 +54,7 @@ export class Room extends DurableObject {
       case 'ping': return this.send(c, { t: 'pong' });
       case 'leave': return this.leave(s);
       case 'bid': case 'pass': return this.play(c, s, m);
+      case 'ord': return this.order(s, m);
     }
     if (this.phase === 'lobby') this.lobbyMsg(c, s, m);
     else if (this.phase === 'done' && m.t === 'reseason' && s.host) { this.seed = seedNow(); this.rd = 0; this.roundAt = 0; this.seasonOn = true; this.all({ t: 'season', seed: this.seed }); }
@@ -155,7 +156,7 @@ export class Room extends DurableObject {
       bd: A.bids.map(b => [b.team.id, b.kind, b.price, b.inc || 0, b.first ? 1 : 0]),
       sd: A.sold ? [A.sold.player.id, A.sold.team ? A.sold.team.id : -1, A.sold.price, A.sold.note || ''] : null, hold: Math.max(0, this.hold - Date.now()) };
     if (full || A.version !== this.sentV) {
-      o.teams = this.teams.map(t => ({ b: t.budget, r: t.roster.map(p => [p.id, p.paid]), au: (t.auto || []).map(p => p.id) }));
+      o.teams = this.teams.map(t => ({ b: t.budget, r: t.roster.map(p => [p.id, p.paid]), au: (t.auto || []).map(p => p.id), o: t.order || null }));
       o.lg = A.log.slice(0, 12).map(s => [s.player.id, s.team ? s.team.id : -1, s.price, s.note || '']);
     }
     return o;
@@ -169,6 +170,12 @@ export class Room extends DurableObject {
     const A = this.A, ok = m.t === 'bid' ? (Number.isInteger(m.amount) && A.bid(s.team, m.amount)) : A.pass(s.team);
     if (ok) { this.key = this.stateKey(); this.pushSnap(); } else this.sendSnap(c, true);
   }
+  // arranjo do campo (em que vaga cada titular joga): só humano, só durante o leilão; o servidor completa/valida na hora de usar (normOrder)
+  order(s, m) {
+    if (this.phase !== 'auction' || !s.team || !s.team.human || !m.o || typeof m.o !== 'object') return;
+    const o = {}; for (const pos of POS_ORDER) { const a = m.o[pos]; if (Array.isArray(a)) o[pos] = a.slice(0, SLOTS[pos]).map(x => Number.isInteger(x) ? x : null); }
+    s.team.order = o;
+  }
   step() {
     const now = Date.now(), A = this.A; let dt = Math.min(500, now - this.last); if (dt <= 0) dt = 100; this.last = now;
     if (now >= this.hold) A.tick(dt);
@@ -177,7 +184,7 @@ export class Room extends DurableObject {
     const k = this.stateKey();
     if (k !== this.key || now - this.lastSync >= 1000) { this.key = k; this.pushSnap(); }
   }
-  endView() { return { t: 'end', seed: this.cseed, teams: this.teams.map(t => ({ b: t.budget, r: t.roster.map(p => [p.id, p.paid]), au: (t.auto || []).map(p => p.id) })) }; }
+  endView() { return { t: 'end', seed: this.cseed, teams: this.teams.map(t => ({ b: t.budget, r: t.roster.map(p => [p.id, p.paid]), au: (t.auto || []).map(p => p.id), o: t.order || null })) }; }
   sendEnd(c) { this.send(c, this.endView()); }
   sendResume(c) { if (this.seasonOn) this.send(c, { t: 'resume', seed: this.seed, rd: this.rd | 0, since: this.roundAt ? Date.now() - this.roundAt : 0 }); }
   finish() {

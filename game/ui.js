@@ -556,16 +556,19 @@ const POSINFO = {
     ['CB', 'Cornerback', 2, 'Cobrem os receptores. Tentam derrubar ou interceptar o passe e não deixam o WR escapar.']
   ]
 };
+const wfmt = x => nf(x.toFixed(2).replace(/0+$/, '').replace(/\.$/, ''));
 function fieldHTML(side, rows, o) {
   const by = {}; rows.forEach(r => (by[r.pos] = by[r.pos] || []).push(r));
   const sp = SPOT[side], xs = sp.map(q => q[2]), x0 = Math.min(...xs), span = Math.max(...xs) - x0 + 1.2, rowsN = Math.max(...sp.map(q => q[3])) + 1;
   const cells = sp.map(([pos, i, x, y]) => {
     const r = by[pos][i], want = o.cur && !r.p && o.cur.pos === pos, isNew = o.newId != null && r.p && r.p.id === o.newId, lk = r.p && o.linked && o.linked.has(r.p.id);
     const logo = r.p ? badge(frIdx(r.p), 34) : '<span class="plus">+</span>';
-    return `<div class="tk ${side} ${r.p ? '' : 'empty'} ${want ? 'want' : ''} ${isNew ? 'new' : ''} ${lk ? 'lk' : ''} ${o.sel && o.sel.pos === pos ? (o.sel.i === i ? 'sel' : 'tgt') : ''}" data-pos="${pos}" data-i="${i}" data-id="${r.p ? r.p.id : ''}" style="left:${(x - x0 + .6) / span * 100}%;top:calc(${y} * var(--rh));width:${100 / span}%${lk ? ';--tc:' + EMB[frIdx(r.p)][1] : ''}"><div class="r"><span class="c">${logo}</span><span class="ov num">${r.p ? r.p.ovr : ''}</span></div><small>${r.p ? esc(shortName(r.p.name)) : ''}</small><b>${pos}${WEIGHT[pos] > 1 ? `<em>${nf(WEIGHT[pos])}x</em>` : ''}</b></div>`;
+    const bn = r.p && o.bw && o.bw[side] ? o.bw[side].get(r.p.id) || 0 : 0, w = WEIGHT[pos];
+    const wt = bn > 0.004 ? `<em class="up" title="${t('Sinergia')} +${wfmt(bn)}x">▲${wfmt(w + bn)}x</em>` : w > 1 ? `<em>${wfmt(w)}x</em>` : '';
+    return `<div class="tk ${side} ${r.p ? '' : 'empty'} ${want ? 'want' : ''} ${isNew ? 'new' : ''} ${lk ? 'lk' : ''} ${o.sel && o.sel.pos === pos ? (o.sel.i === i ? 'sel' : 'tgt') : ''}" data-pos="${pos}" data-i="${i}" data-id="${r.p ? r.p.id : ''}" style="left:${(x - x0 + .6) / span * 100}%;top:calc(${y} * var(--rh));width:${100 / span}%${lk ? ';--tc:' + EMB[frIdx(r.p)][1] : ''}"><div class="r"><span class="c">${logo}</span><span class="ov num">${r.p ? r.p.ovr : ''}</span></div><small>${r.p ? esc(shortName(r.p.name)) : ''}</small><b>${pos}${wt}</b></div>`;
   });
   const got = rows.filter(r => r.p).length;
-  const sy = o.syn && o.syn[side] ? `<span class="sy">${t('Sinergia')} +${nf(o.syn[side].toFixed(1))}</span>` : '', up = o.up && o.up[side] ? `<span class="sy up">${t('Esse lote liga com seu time')}</span>` : '';
+  const sy = o.syn && o.syn[side] ? `<span class="sy">${t('Sinergia')} +${nf(o.syn[side].toFixed(1))}</span>` : '', up = o.up && o.up[side] ? `<span class="sy up">${t('Esse lote liga com seu time')} +${nf(o.up[side].toFixed(1))}</span>` : '';
   return `<div class="fld"><div class="fh"><span>${t(side === 'off' ? 'ATAQUE' : 'DEFESA')} ${sy}</span>${up}<span class="num">${got}/8</span></div><div class="fg" style="--rows:${rowsN}">${cells.join('')}</div></div>`;
 }
 // linhas de sinergia estilo FIFA: ligam os titulares do mesmo time da NFL, na cor do time
@@ -574,30 +577,61 @@ function drawLinks(links, root) {
   const run = () => ['off', 'def'].forEach((sd, k) => {
     const fg = $(root).querySelectorAll('.fg')[k]; if (!fg || !links[sd].length) return;
     const R0 = fg.getBoundingClientRect(), pt = id => { const c = fg.querySelector(`.tk[data-id="${id}"] .c`); if (!c) return null; const b = c.getBoundingClientRect(); return [b.left + b.width / 2 - R0.left, b.top + b.height / 2 - R0.top]; };
-    let svg = '';
+    let svg = '', pills = '';
     for (const l of links[sd]) { const a = pt(l.a.id), b = pt(l.b.id); if (!a || !b) continue; const col = EMB[frIdx(l.a)][1];
-      svg += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#04121a" stroke-width="6" stroke-linecap="round" opacity=".55"/><line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${col}" stroke-width="3" stroke-linecap="round"/>`; }
+      svg += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#04121a" stroke-width="7" stroke-linecap="round" opacity=".55"/><line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${col}" stroke-width="3.5" stroke-linecap="round" style="filter:drop-shadow(0 0 3px ${col})"/>`;
+      const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, tx = '+' + nf(l.pts.toFixed(1));
+      pills += `<rect x="${mx - 15}" y="${my - 8}" width="30" height="16" rx="8" fill="#04121a" stroke="${col}" stroke-width="1.5"/><text x="${mx}" y="${my + 3.6}" text-anchor="middle" font-size="10" font-weight="800" fill="#fff" font-family="inherit">${tx}</text>`; }
+    svg += pills;
     fg.insertAdjacentHTML('afterbegin', `<svg class="lk" width="${R0.width}" height="${R0.height}">${svg}</svg>`);
   });
   requestAnimationFrame(run);
 }
+// onde cada jogador do elenco joga em campo (M.order). Quem acabou de chegar entra na vaga selecionada (se livre) ou na primeira vaga livre.
+function placeIn(ord, p, sel) {
+  const s = ord[p.pos], i = sel && sel.pos === p.pos && s[sel.i] == null ? sel.i : s.indexOf(null);
+  if (i >= 0) s[i] = p.id; return ord;
+}
+function ensureOrder(M) {
+  const old = M.order || {}, known = new Set(Object.values(old).flat().filter(x => x != null));
+  const ord = normOrder(M.roster.filter(p => known.has(p.id)), old);
+  M.roster.filter(p => !known.has(p.id)).forEach(p => { placeIn(ord, p, G.sel); if (G.sel && G.sel.pos === p.pos) G.sel = null; });
+  const key = JSON.stringify(ord);
+  if (M._ok !== key) { M._ok = key; M.order = ord; if (G.mp && M.human) mpSend({ t: 'ord', o: ord }); } else M.order = ord;
+  return ord;
+}
 function paintLineup() {
-  const A = G.A, M = me(), rows = lineupRows(M.roster);
+  const A = G.A, M = me();
+  if (!M.roster.length) G.sel = null;
+  const ord = ensureOrder(M), rows = lineupRows(M.roster, ord);
   const flash = A.sold && A.sold.team === M && G.flashedV !== A.version ? A.sold.player.id : null;
   if (flash != null) G.flashedV = A.version;
-  const o = { cur: A.phase === 'bidding' ? A.cur : null, newId: flash };
+  const o = { cur: A.phase === 'bidding' ? A.cur : null, newId: flash, sel: G.sel };
   const off = rows.filter(r => OFF_POS.includes(r.pos)), def = rows.filter(r => !OFF_POS.includes(r.pos));
-  const L = lineup(M.roster), links = { off: synLinks(L, 'off'), def: synLinks(L, 'def') };
+  const L = lineup(M.roster, ord), I = { off: synInfo(L, 'off'), def: synInfo(L, 'def') }, links = { off: I.off.links, def: I.def.links };
   o.linked = new Set(); ['off', 'def'].forEach(sd => links[sd].forEach(l => { o.linked.add(l.a.id); o.linked.add(l.b.id); }));
-  o.syn = { off: synPts(links.off), def: synPts(links.def) };
-  if (o.cur && M.roster.length < TOTAL_SLOTS) {      // o lote em disputa ligaria com alguém do seu time?
-    const L2 = lineup(M.roster.concat([o.cur])), sd = OFF_POS.includes(o.cur.pos) ? 'off' : 'def', n2 = synLinks(L2, sd);
-    if (n2.some(l => l.a.id === o.cur.id || l.b.id === o.cur.id)) o.up = { [sd]: true };
+  o.syn = { off: I.off.pts, def: I.def.pts }; o.bw = { off: I.off.bw, def: I.def.bw };
+  if (o.cur && M.roster.length < TOTAL_SLOTS) {      // o lote em disputa ligaria com alguém do seu time? (quanto de sinergia ele traria)
+    const sd = OFF_POS.includes(o.cur.pos) ? 'off' : 'def', o2 = JSON.parse(JSON.stringify(ord)); placeIn(o2, o.cur, G.sel);
+    const I2 = synInfo(lineup(M.roster.concat([o.cur]), o2), sd);
+    if (I2.links.some(l => l.a.id === o.cur.id || l.b.id === o.cur.id)) o.up = { [sd]: Math.max(0.1, I2.pts - I[sd].pts) };
   }
   $('#fm').innerHTML = fieldHTML('off', off, o) + fieldHTML('def', def, o);
   drawLinks(links);
+  const sp = G.sel && (M.roster.find(p => p.id === ord[G.sel.pos][G.sel.i]));
+  $('#fm-act').textContent = G.sel ? (sp ? t('Toque em outra vaga de {p} pra trocar {n} de lugar.', { p: G.sel.pos, n: shortName(sp.name) }) : t('Vaga selecionada: o próximo {p} que você comprar entra aqui.', { p: G.sel.pos })) : t('Toque num jogador e depois em outra vaga da mesma posição pra mudar de lugar.');
   $('#lst').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE')}</div>${off.map(r => slotHTML(r, o)).join('')}<div class="sub">${t('DEFESA')}</div>${def.map(r => slotHTML(r, o)).join('')}`;
 }
+$('#fm').onclick = e => {
+  const k = e.target.closest('.tk'); if (!k || !G.A || G.A.done) return;
+  const M = me(), pos = k.dataset.pos, i = +k.dataset.i;
+  if (G.sel && G.sel.pos === pos) {
+    if (G.sel.i !== i) { const s = M.order[pos]; [s[G.sel.i], s[i]] = [s[i], s[G.sel.i]]; }       // troca (ou move pra vaga livre)
+    G.sel = G.sel.i === i ? null : { pos, i };
+  } else G.sel = { pos, i };
+  paintLineup();
+  if (G.mp && M.human) mpSend({ t: 'ord', o: M.order });
+};
 
 // ---------- SANDBOX: monte o elenco sem leilão, sem dinheiro ----------
 const SB = { slots: {}, pos: 'QB', q: '', sel: null };
@@ -620,7 +654,7 @@ function sbPick(p) {
 function paintSandbox() {
   const roster = sbRoster(), rows = lineupRows(roster, SB.slots), L = lineup(roster, SB.slots);
   const off = rows.filter(r => OFF_POS.includes(r.pos)), def = rows.filter(r => !OFF_POS.includes(r.pos));
-  const links = { off: synLinks(L, 'off'), def: synLinks(L, 'def') }, o = { sel: SB.sel, linked: new Set(), syn: { off: synPts(links.off), def: synPts(links.def) } };
+  const I = { off: synInfo(L, 'off'), def: synInfo(L, 'def') }, links = { off: I.off.links, def: I.def.links }, o = { sel: SB.sel, linked: new Set(), syn: { off: I.off.pts, def: I.def.pts }, bw: { off: I.off.bw, def: I.def.bw } };
   ['off', 'def'].forEach(sd => links[sd].forEach(l => { o.linked.add(l.a.id); o.linked.add(l.b.id); }));
   const full = roster.length === TOTAL_SLOTS, rt = ratings(L), f = x => nf(x.toFixed(1));
   $('#sb-stats').innerHTML = `<div><b class="num">${full ? f(rt.all) : '–'}</b><span>OVR</span></div><div><b class="num">${roster.length ? f(rt.off) : '–'}</b><span>${t('ATAQUE')}</span></div><div><b class="num">${roster.length ? f(rt.def) : '–'}</b><span>${t('DEFESA')}</span></div><div class="sy"><b class="num">+${f(o.syn.off + o.syn.def)}</b><span>${t('Sinergia')}</span></div>`;
@@ -631,11 +665,11 @@ function paintSandbox() {
   $('#sb-tabs').innerHTML = POS_ORDER.map(p => `<button type="button" data-p="${p}" class="${SB.pos === p ? 'on' : ''}" role="tab">${p}<small>${SB.slots[p].filter(x => x != null).length}/${SLOTS[p]}</small></button>`).join('');
   const q = SB.q.trim().toLowerCase(), side = OFF_POS.includes(SB.pos) ? 'off' : 'def';
   const list = sbPool().filter(p => p.pos === SB.pos && (!q || p.name.toLowerCase().includes(q) || frName(p).toLowerCase().includes(q) || p.tm.toLowerCase() === q)).sort((a, b) => b.ovr - a.ovr).slice(0, 60);
-  const cur = synPts(links[side]);
+  const cur = I[side].pts;
   $('#sb-list').innerHTML = list.map(p => {
     const inn = SB.slots[p.pos].includes(p.id); let g = '';
     if (!inn) {                           // quanto o lado ganha de sinergia se ele entrar (na vaga que seria usada)
-      const s2 = sbPlace(sbCopy(), p), d = synPts(synLinks(lineup(sbRoster(s2), s2), side)) - cur;
+      const s2 = sbPlace(sbCopy(), p), d = synInfo(lineup(sbRoster(s2), s2), side).pts - cur;
       if (d > 0.04) g = `<span class="g">✦ +${f(d)}</span>`;
     }
     return `<button type="button" class="sbr ${inn ? 'in' : ''}" data-id="${p.id}">${badge(frIdx(p), 32)}<span class="n"><b>${esc(p.name)}</b><small>${esc(frName(p))}</small></span>${g || '<span class="g"></span>'}<span class="o num">${inn ? '✓' : p.ovr}</span></button>`;
@@ -660,7 +694,7 @@ $('#sb-act').onclick = e => { if (e.target.closest('#sb-rm') && SB.sel) { SB.slo
 $('#sb-list').onclick = e => { const b = e.target.closest('[data-id]'); if (!b) return; sbPick(sbById(+b.dataset.id)); paintSandbox(); };
 function openPosInfo() {
   const row = s => ([p, n, q, d]) => `<div class="pi"><span class="pos ${s}">${p}</span><div><b>${n}<em>${tpl('{n} vaga', '{n} vagas', q)} · ${nf(WEIGHT[p].toFixed(2).replace(/0$/, ''))}x</em></b><p>${t(d)}</p></div></div>`;
-  $('#posinfo-b').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE · tem a bola')}</div>${POSINFO.off.map(row('off')).join('')}<div class="sub">${t('DEFESA · tenta tomar a bola')}</div>${POSINFO.def.map(row('def')).join('')}<p class="sh-n">${t('O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR, LB e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.')}</p><p class="sh-n">${t('Sinergia: dois titulares do mesmo time da NFL, do mesmo lado e lado a lado no campo ganham uma linha na cor do time e somam pontos no OVR (QB + WR = +1,0; RB + QB ≈ +0,9; linha com linha = +0,5), até +4 por lado. Quem está longe um do outro não se conecta.')}</p>`;
+  $('#posinfo-b').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE · tem a bola')}</div>${POSINFO.off.map(row('off')).join('')}<div class="sub">${t('DEFESA · tenta tomar a bola')}</div>${POSINFO.def.map(row('def')).join('')}<p class="sh-n">${t('O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR, LB e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.')}</p><p class="sh-n">${t('Sinergia: dois titulares do mesmo time da NFL, do mesmo lado e lado a lado no campo ganham uma linha na cor do time. Cada link soma +0,1x no peso dos dois (o RB de 1,0x ligado ao QB vira 1,1x, e o QB de 2,5x vira 2,6x), e esse peso extra vira pontos de OVR, até +4 por lado. Você escolhe em que vaga cada jogador joga: toque num jogador e depois em outra vaga da mesma posição pra trocar de lugar.')}</p>`;
   $('#posinfo').hidden = false; $('#posinfo-b').scrollTop = 0;
 }
 $('#pos-info').onclick = openPosInfo;
@@ -745,7 +779,7 @@ document.addEventListener('keydown', e => {
 
 // ----- resultados -----
 function teamLineupHTML(t) {
-  const rows = lineupRows(t.roster), off = rows.filter(r => OFF_POS.includes(r.pos)), def = rows.filter(r => !OFF_POS.includes(r.pos));
+  const rows = lineupRows(t.roster, t.order), off = rows.filter(r => OFF_POS.includes(r.pos)), def = rows.filter(r => !OFF_POS.includes(r.pos));
   return `<div class="lu"><div><div class="sub" style="margin-top:0">${tt('ATAQUE')} · ${t.rt.off.toFixed(1)}</div>${off.map((r, i) => slotHTML(r, { i })).join('')}</div><div><div class="sub">${tt('DEFESA')} · ${t.rt.def.toFixed(1)}</div>${def.map((r, i) => slotHTML(r, { i: i + off.length })).join('')}</div></div>`;
 }
 function showResults() {

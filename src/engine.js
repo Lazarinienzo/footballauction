@@ -39,7 +39,7 @@ const shortName = n => { const t = n.replace(/\s+(Jr\.?|Sr\.?|II|III|IV)$/i, '')
 // order (opcional): { WR: [id, id], OL: [id, id, id], ... } = em que vaga do campo cada titular joga (Sandbox). Sem order, o melhor OVR ocupa a primeira vaga.
 function lineup(roster, order) {
   const by = p => roster.filter(x => x.pos === p).sort((a, b) => b.ovr - a.ovr);
-  const at = p => order && order[p] ? order[p].map(id => roster.find(x => x.id === id && x.pos === p)) : by(p);
+  const at = p => order && Array.isArray(order[p]) ? order[p].map(id => roster.find(x => x.id === id && x.pos === p)) : by(p);
   return { QB: at('QB')[0], RB: at('RB')[0], WR: at('WR'), TE: at('TE')[0], OL: at('OL'),
            EDGE: at('EDGE'), DT: at('DT'), LB: at('LB'), CB: at('CB') };
 }
@@ -57,22 +57,60 @@ function sideStarters(L, side) {
   return SPOT[side].map(([pos, i, x, y]) => ({ pos, i, x, y, p: Array.isArray(L[pos]) ? L[pos][i] : L[pos], w: WEIGHT[pos] }));
 }
 // SINERGIA: dois titulares do MESMO lado, do mesmo time da NFL e VIZINHOS no campo formam um link.
-// Cada link soma SYN pontos de OVR por peso das duas posições (QB+WR = +1,0; RB+QB ≈ +0,9; OL+OL = +0,5), com teto por lado.
-const SYN = 0.25, SYN_CAP = 4;
+// Cada link soma +SYN_W no PESO dos dois jogadores (RB 1,0x ligado ao QB vira 1,1x; o QB vai de 2,5x a 2,6x), e o peso extra
+// conta inteiro no OVR do lado (a média continua dividida pelo peso base, então é bônus de verdade). Teto de SYN_CAP pontos por lado.
+const SYN_W = 0.1, SYN_CAP = 4;
+const SIDE_W = { off: SPOT.off.reduce((n, q) => n + WEIGHT[q[0]], 0), def: SPOT.def.reduce((n, q) => n + WEIGHT[q[0]], 0) };
 function synLinks(L, side) {
   const xs = sideStarters(L, side).filter(x => x.p && x.p.tm), out = [];
   for (let i = 0; i < xs.length; i++) for (let j = i + 1; j < xs.length; j++)
     if (xs[i].p.tm === xs[j].p.tm && Math.hypot(xs[i].x - xs[j].x, xs[i].y - xs[j].y) <= SYN_DIST)
-      out.push({ a: xs[i].p, b: xs[j].p, pa: xs[i].pos, pb: xs[j].pos, tm: xs[i].p.tm, pts: SYN * (xs[i].w + xs[j].w) });
+      out.push({ a: xs[i].p, b: xs[j].p, pa: xs[i].pos, pb: xs[j].pos, tm: xs[i].p.tm, pts: SYN_W * (xs[i].p.ovr + xs[j].p.ovr) / SIDE_W[side] });
   return out;
 }
-const synPts = links => Math.min(SYN_CAP, links.reduce((n, l) => n + l.pts, 0));
+// links, peso extra de cada jogador (id -> +x, já com o teto aplicado) e pontos de OVR que a sinergia dá ao lado
+function synInfo(L, side) {
+  const links = synLinks(L, side), bw = new Map(); let raw = 0;
+  for (const l of links) { raw += l.pts; for (const q of [l.a, l.b]) bw.set(q.id, (bw.get(q.id) || 0) + SYN_W); }
+  const k = raw > SYN_CAP ? SYN_CAP / raw : 1;
+  if (k < 1) for (const [id, v] of bw) bw.set(id, v * k);
+  return { links, bw, pts: raw * k, raw, capped: k < 1 };
+}
 // OVR do ataque / da defesa = média PONDERADA dos 8 titulares do lado + bônus de sinergia.
 function ratings(L) {
   const wavg = side => { const xs = sideStarters(L, side).filter(x => x.p); return xs.length ? xs.reduce((n, x) => n + x.p.ovr * x.w, 0) / xs.reduce((n, x) => n + x.w, 0) : 0; };   // vagas abertas (Sandbox) ficam fora da média
-  const off = wavg('off') + synPts(synLinks(L, 'off'));
-  const def = wavg('def') + synPts(synLinks(L, 'def'));
+  const off = wavg('off') + synInfo(L, 'off').pts;
+  const def = wavg('def') + synInfo(L, 'def').pts;
   return { off, def, all: (off + def) / 2 };
+}
+
+// ---------- arranjo no campo: em que vaga cada titular joga ----------
+// Completa e valida um arranjo { pos: [id|null, ...] }: ignora ids que não estão no elenco, e põe quem faltar na primeira vaga livre (melhor OVR primeiro).
+function normOrder(roster, order) {
+  const out = {};
+  for (const pos of POS_ORDER) {
+    const have = roster.filter(p => p.pos === pos), ids = new Set(have.map(p => p.id)), slots = Array(SLOTS[pos]).fill(null);
+    (order && Array.isArray(order[pos]) ? order[pos] : []).forEach((id, i) => { if (i < slots.length && id != null && ids.has(id) && !slots.includes(id)) slots[i] = id; });
+    const rest = have.filter(p => !slots.includes(p.id)).sort((a, b) => b.ovr - a.ovr);
+    for (let i = 0; i < slots.length && rest.length; i++) if (slots[i] == null) slots[i] = rest.shift().id;
+    out[pos] = slots;
+  }
+  return out;
+}
+const perms = a => a.length < 2 ? [a] : a.flatMap((x, i) => perms(a.filter((_, j) => j !== i)).map(r => [x, ...r]));
+// arranjo com mais sinergia (usado pelos bots e por quem não mexeu no campo); empate fica com o melhor OVR na primeira vaga
+function autoOrder(roster) {
+  let best = normOrder(roster, null);
+  for (const side of ['off', 'def']) {
+    const poss = [...new Set(SPOT[side].map(q => q[0]))].filter(pos => SLOTS[pos] > 1);
+    let top = -1, pick = null;
+    const go = (k, cur) => {
+      if (k === poss.length) { const o = { ...best, ...cur }, v = synInfo(lineup(roster, o), side).pts; if (v > top + 1e-9) { top = v; pick = o; } return; }
+      for (const pm of perms(best[poss[k]])) go(k + 1, { ...cur, [poss[k]]: pm });
+    };
+    go(0, {}); best = pick;
+  }
+  return best;
 }
 
 // ---------- partida: 6 posses por time ----------
@@ -327,7 +365,7 @@ function drawConferences(teams) {
 }
 
 // ---------- temporada ----------
-function finishTeam(t) { t.lineup = lineup(t.roster); t.rt = ratings(t.lineup); return t; }
+function finishTeam(t) { t.order = t.order ? normOrder(t.roster, t.order) : autoOrder(t.roster); t.lineup = lineup(t.roster, t.order); t.rt = ratings(t.lineup); return t; }
 const rankRow = (x, y) => (y.w + y.t / 2) - (x.w + x.t / 2) || (y.pf - y.pa) - (x.pf - x.pa) || y.pf - x.pf;
 // classificação de cada conferência a partir de uma lista de jogos já disputados
 function buildTables(confs, games) {

@@ -158,9 +158,9 @@ function mpStartMsg(m) {
   A.pass = function (team) { if (this.hold > 0 || !Auction.prototype.pass.call(this, team)) return false; mpSend({ t: 'pass' }); return true; };
   G.A = A; MP.enter = true;
 }
-function mpApplyTeams(list) {
+function mpApplyTeams(list, fin) {
   const A = G.A;
-  list.forEach((x, k) => { const t = G.teams[k]; t.budget = x.b; t.roster = x.r.map(([id, paid]) => { const p = A.pool[id]; return { name: p.name, pos: p.pos, ovr: p.ovr, tm: p.tm, id, paid }; }); t.auto = x.au.map(id => A.pool[id]); });
+  list.forEach((x, k) => { const t = G.teams[k]; t.budget = x.b; t.roster = x.r.map(([id, paid]) => { const p = A.pool[id]; return { name: p.name, pos: p.pos, ovr: p.ovr, tm: p.tm, id, paid }; }); t.auto = x.au.map(id => A.pool[id]); if (x.o && (fin || !t.human || !t.order)) t.order = x.o; });
   A.pool.forEach(p => { p.sold = false; }); G.teams.forEach(t => t.roster.forEach(p => { A.pool[p.id].sold = true; }));
 }
 function mpSnap(s) {
@@ -194,7 +194,7 @@ function mpResume(m) {
 }
 function mpEnd(m) {
   if (!G.A || !G.mp) return;
-  MP.cseed = m.seed; mpApplyTeams(m.teams);
+  MP.cseed = m.seed; mpApplyTeams(m.teams, true);
   if (MP.phase === 'results') return;
   MP.phase = 'results'; G.A.done = true; G.A.phase = 'done';
   if (MP.enter) { MP.enter = false; mpEnter(); }          // entrou só no fim (reconexão): a próxima volta do relógio abre os resultados
