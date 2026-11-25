@@ -36,10 +36,12 @@ const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { c
 const shortName = n => { const t = n.replace(/\s+(Jr\.?|Sr\.?|II|III|IV)$/i, '').split(' '); return t[t.length - 1]; };
 
 // ---------- escalação e OVR de ataque / defesa ----------
-function lineup(roster) {
+// order (opcional): { WR: [id, id], OL: [id, id, id], ... } = em que vaga do campo cada titular joga (Sandbox). Sem order, o melhor OVR ocupa a primeira vaga.
+function lineup(roster, order) {
   const by = p => roster.filter(x => x.pos === p).sort((a, b) => b.ovr - a.ovr);
-  return { QB: by('QB')[0], RB: by('RB')[0], WR: by('WR'), TE: by('TE')[0], OL: by('OL'),
-           EDGE: by('EDGE'), DT: by('DT'), LB: by('LB'), CB: by('CB') };
+  const at = p => order && order[p] ? order[p].map(id => roster.find(x => x.id === id && x.pos === p)) : by(p);
+  return { QB: at('QB')[0], RB: at('RB')[0], WR: at('WR'), TE: at('TE')[0], OL: at('OL'),
+           EDGE: at('EDGE'), DT: at('DT'), LB: at('LB'), CB: at('CB') };
 }
 // Peso de cada posição no OVR do time. A base é 1,0x; a média é sempre dividida pela soma dos pesos, então a escala do OVR não muda.
 const WEIGHT = { QB: 2.5, RB: 1.0, WR: 1.5, TE: 1.0, OL: 1.0, EDGE: 2.0, DT: 1.0, LB: 1.5, CB: 1.5 };   // base 1,0x; degraus 1,5x e 2,0x; o QB vale 2,5x

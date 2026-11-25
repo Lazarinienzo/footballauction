@@ -463,6 +463,9 @@ html,body{overflow-x:hidden}
 .sbs .sy b{color:#5fe39a}
 #sb-fm .fld .tk{cursor:pointer}
 .tk.sel .c{outline:3px solid var(--hi);outline-offset:1px}
+.tk.tgt .c{outline:2px dashed var(--hi);outline-offset:2px;animation:tkp 1.1s ease-in-out infinite alternate}
+.sbact{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;font-size:13px;color:var(--mute);min-height:34px}
+.sbact .mini{flex:none}
 .sbp{margin-top:14px;padding:12px}
 .sbtabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none}
 .sbtabs::-webkit-scrollbar{display:none}
@@ -806,6 +809,7 @@ html,body{overflow-x:hidden}
   </div>
   <div class="card sbs" id="sb-stats"></div>
   <div id="sb-fm"></div>
+  <div class="sbact" id="sb-act"></div>
   <div class="card sbp">
     <div class="sbtabs" id="sb-tabs" role="tablist"></div>
     <input class="pwin" id="sb-q" type="search" maxlength="30" autocomplete="off" placeholder="Buscar jogador ou time" aria-label="Buscar jogador ou time">
