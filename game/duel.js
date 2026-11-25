@@ -217,7 +217,7 @@ function dtIntro(tg) {
   $('#dt-stage').innerHTML = `<div class="dintro"><small>${t('Sorteando a posição…')}</small><div class="reel" id="dt-reel"><div class="strip" id="dt-strip" style="transition-duration:${dtDur(T_SPIN)}ms">${seq.map(p => `<span>${p}</span>`).join('')}</div></div><em id="dt-pn">&nbsp;</em></div>`;
   $('#dt-act').innerHTML = ''; $('#dt-leg').innerHTML = ''; $('#dh-who').innerHTML = ''; $('#du-stat').textContent = t('Sorteando a posição…');
   const strip = $('#dt-strip'); void strip.offsetHeight;
-  dtAt(() => { strip.style.transform = `translateY(-${(N - 1) * REEL_H}px)`; }, T_PRE);
+  dtAt(() => { strip.style.transform = `translateY(-${(N - 1) * REEL_H}px)`; sfx.reel(dtDur(T_SPIN) / 1000, N - 1, REDUCED); }, T_PRE);
   dtAt(() => { $('#dt-reel').classList.add('landed'); $('#dt-pn').textContent = t(DU_FULL[s.pos]); dtHead(s, true); }, T_PRE + T_SPIN);
   dtAt(() => dtShow(tg, true), T_PRE + T_SPIN + T_LAND);
 }

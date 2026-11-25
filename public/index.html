@@ -2729,6 +2729,28 @@ const sfx = {
       tone(220, .02, .12, .22, 'sine', 150);
     }
   },
+  // roleta do Duelo: um "clique" a cada posição que passa (seguindo a desaceleração da animação) e três "dings" quando para
+  reel(dur, rows, still) {
+    if (!sfx.on || !sfx.ctx) return; if (sfx.ctx.state !== 'running') { sfx.ctx.resume().catch(() => { }); return; }
+    const c = sfx.ctx, t0 = c.currentTime + .02, out = c.createGain(); out.gain.value = .9; out.connect(c.destination);
+    if (!sfx.nb) { sfx.nb = c.createBuffer(1, c.sampleRate, c.sampleRate); const d = sfx.nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+    const tone = (f, at, d, v, type, f2) => {
+      const o = c.createOscillator(), g = c.createGain(); o.type = type || 'sine'; o.frequency.setValueAtTime(f, t0 + at); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + at + d);
+      g.gain.setValueAtTime(0, t0 + at); g.gain.linearRampToValueAtTime(v, t0 + at + .006); g.gain.exponentialRampToValueAtTime(.001, t0 + at + d);
+      o.connect(g); g.connect(out); o.start(t0 + at); o.stop(t0 + at + d + .05);
+    };
+    const bz = (a, b, u) => 3 * a * (1 - u) * (1 - u) * u + 3 * b * (1 - u) * u * u + u * u * u;   // mesma curva cubic-bezier(.12,.72,.14,1) do CSS
+    if (!still) for (let k = 1; k <= rows; k++) {
+      let lo = 0, hi = 1; for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; if (bz(.72, 1, m) < k / rows) lo = m; else hi = m; }
+      const at = bz(.12, .14, (lo + hi) / 2) * dur, last = k > rows - 4;
+      tone(last ? 1100 : 1500, at, .045, last ? .24 : .17, 'triangle', last ? 700 : 950);
+      const n = c.createBufferSource(), bp = c.createBiquadFilter(), g = c.createGain(); n.buffer = sfx.nb; bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 1.4;
+      g.gain.setValueAtTime(.09, t0 + at); g.gain.exponentialRampToValueAtTime(.001, t0 + at + .03); n.connect(bp); bp.connect(g); g.connect(out); n.start(t0 + at, Math.random() * .5); n.stop(t0 + at + .05);
+    }
+    const e = still ? 0 : dur;
+    tone(90, e, .25, .3, 'sine', 50);                                                              // trava
+    [[784, 0], [1046.5, .13], [1568, .26]].forEach(([f, d], i) => { tone(f, e + .03 + d, .55, .22, 'sine'); tone(f * 2, e + .03 + d, .3, .05, 'sine'); });   // ding-ding-ding
+  },
   paint() { const b = $('#a-snd'); if (b) { b.classList.toggle('off', !sfx.on); b.setAttribute('aria-pressed', String(sfx.on)); b.setAttribute('aria-label', t(sfx.on ? 'Som ligado' : 'Som desligado')); } }
 };
 ['pointerup', 'touchend', 'click', 'keydown'].forEach(ev => document.addEventListener(ev, sfx.unlock, { passive: true }));   // no celular só pointerup/touchend/click contam como toque pra liberar o áudio
@@ -4141,7 +4163,7 @@ function dtIntro(tg) {
   $('#dt-stage').innerHTML = `<div class="dintro"><small>${t('Sorteando a posição…')}</small><div class="reel" id="dt-reel"><div class="strip" id="dt-strip" style="transition-duration:${dtDur(T_SPIN)}ms">${seq.map(p => `<span>${p}</span>`).join('')}</div></div><em id="dt-pn">&nbsp;</em></div>`;
   $('#dt-act').innerHTML = ''; $('#dt-leg').innerHTML = ''; $('#dh-who').innerHTML = ''; $('#du-stat').textContent = t('Sorteando a posição…');
   const strip = $('#dt-strip'); void strip.offsetHeight;
-  dtAt(() => { strip.style.transform = `translateY(-${(N - 1) * REEL_H}px)`; }, T_PRE);
+  dtAt(() => { strip.style.transform = `translateY(-${(N - 1) * REEL_H}px)`; sfx.reel(dtDur(T_SPIN) / 1000, N - 1, REDUCED); }, T_PRE);
   dtAt(() => { $('#dt-reel').classList.add('landed'); $('#dt-pn').textContent = t(DU_FULL[s.pos]); dtHead(s, true); }, T_PRE + T_SPIN);
   dtAt(() => dtShow(tg, true), T_PRE + T_SPIN + T_LAND);
 }
