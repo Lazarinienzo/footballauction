@@ -455,6 +455,30 @@ html,body{overflow-x:hidden}
 .mt.live .stt::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#e5372a;margin-right:6px;animation:blink 1s infinite}
 .mt .sc{min-width:1.4em;text-align:right}
 
+
+/* sandbox */
+.sbs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;margin-top:12px}
+.sbs b{display:block;font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em}
+.sbs span{display:block;font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--mute);margin-top:2px}
+.sbs .sy b{color:#5fe39a}
+#sb-fm .fld .tk{cursor:pointer}
+.tk.sel .c{outline:3px solid var(--hi);outline-offset:1px}
+.sbp{margin-top:14px;padding:12px}
+.sbtabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none}
+.sbtabs::-webkit-scrollbar{display:none}
+.sbtabs button{flex:none;border:1.5px solid var(--edge);background:transparent;color:var(--chalk);border-radius:999px;padding:7px 13px;font:inherit;font-weight:800;font-size:13px;letter-spacing:.04em}
+.sbtabs button.on{background:var(--flag);color:var(--flag-ink);border-color:transparent}
+.sbtabs button small{font-weight:700;opacity:.7;margin-left:4px}
+#sb-list{margin-top:10px;display:grid;gap:2px}
+.sbr{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:10px;padding:8px 6px;border-radius:12px;background:transparent;border:0;color:var(--chalk);font:inherit;text-align:left;width:100%;min-height:52px}
+.sbr:active{background:var(--panel2)}
+.sbr.in{background:color-mix(in srgb,#5fe39a 14%,transparent)}
+.sbr .n{min-width:0}.sbr .n b{display:block;font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sbr .n small{display:block;font-size:12px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sbr .o{font-family:var(--display);font-weight:800;font-size:20px}
+.sbr .g{font-size:11px;font-weight:800;color:#5fe39a;min-width:34px;text-align:right}
+.sbr .g.neg{color:var(--mute)}
+.sbbar{margin:14px 0 30px;display:flex;justify-content:center}
 /* formação em campo + guia de posições */
 .yard.hd{display:flex;align-items:center;gap:12px}
 .ibtn{flex:none;width:30px;height:30px;border-radius:50%;border:1.5px solid var(--edge);background:transparent;color:var(--chalk);font-family:var(--display);font-weight:800;font-size:16px;line-height:1;display:inline-grid;place-items:center;padding:0}
@@ -721,6 +745,7 @@ html,body{overflow-x:hidden}
     <button class="btn full" id="go-lobby">Criar sala</button>
     <button class="btn ghost full" id="go-solo" hidden>Jogar com Bots</button>
     <div class="join" id="join-off"><input value="" placeholder="Código da sala" disabled aria-label="Código da sala"><button class="btn ghost" disabled>Entrar</button></div>
+    <button class="btn ghost full" id="go-sandbox" type="button">Sandbox: montar o elenco dos sonhos</button>
     <p class="note" id="note-off">Entrar com código chega com o modo online. Por enquanto a sala é sua e as vagas vazias viram bots.</p>
   </div>
   <div id="home-rooms" hidden>
@@ -766,6 +791,27 @@ html,body{overflow-x:hidden}
     <button class="btn ghost" id="cup-again">Refazer temporada</button>
   </div>
   <div id="cup-out" hidden></div>
+</section>
+
+<section id="sandbox" hidden>
+  <header class="top">
+    <button class="back" id="sb-back" aria-label="Voltar">←</button>
+    <span class="wm">touchdown<b>auction</b></span>
+    <span class="tag"><i></i>Sandbox</span>
+  </header>
+  <div class="lb-hero">
+    <small class="eyebrow">SEM DINHEIRO</small>
+    <h1>Sandbox.</h1>
+    <p class="lead" style="margin-top:14px">Sem leilão e sem rivais: escolha os 16 titulares que quiser e monte a melhor sinergia possível.</p>
+  </div>
+  <div class="card sbs" id="sb-stats"></div>
+  <div id="sb-fm"></div>
+  <div class="card sbp">
+    <div class="sbtabs" id="sb-tabs" role="tablist"></div>
+    <input class="pwin" id="sb-q" type="search" maxlength="30" autocomplete="off" placeholder="Buscar jogador ou time" aria-label="Buscar jogador ou time">
+    <div id="sb-list"></div>
+  </div>
+  <div class="sbbar"><button class="btn ghost" id="sb-clear" type="button">Limpar elenco</button></div>
 </section>
 
 <section id="lab" hidden>

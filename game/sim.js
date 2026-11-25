@@ -48,7 +48,7 @@ function synLinks(L, side) {
 const synPts = links => Math.min(SYN_CAP, links.reduce((n, l) => n + l.pts, 0));
 // OVR do ataque / da defesa = média PONDERADA dos 8 titulares do lado + bônus de sinergia.
 function ratings(L) {
-  const wavg = side => { const xs = sideStarters(L, side); return xs.reduce((n, x) => n + x.p.ovr * x.w, 0) / xs.reduce((n, x) => n + x.w, 0); };
+  const wavg = side => { const xs = sideStarters(L, side).filter(x => x.p); return xs.length ? xs.reduce((n, x) => n + x.p.ovr * x.w, 0) / xs.reduce((n, x) => n + x.w, 0) : 0; };   // vagas abertas (Sandbox) ficam fora da média
   const off = wavg('off') + synPts(synLinks(L, 'off'));
   const def = wavg('def') + synPts(synLinks(L, 'def'));
   return { off, def, all: (off + def) / 2 };

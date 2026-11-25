@@ -97,7 +97,7 @@ function tween(el, to, fmt, from) {
   };
   el._r = requestAnimationFrame(step);
 }
-function show(id) { if (id !== 'results' && id !== 'cup') svStop(); if (id === 'setup' && G.mp) mpLeave(); if (id === 'setup' && MP_ON && typeof homeRefresh === 'function') homeRefresh(); for (const s of ['setup', 'lab', 'cup', 'online', 'lobby', 'auction', 'results']) $('#' + s).hidden = s !== id; window.scrollTo(0, 0); }
+function show(id) { if (id !== 'results' && id !== 'cup') svStop(); if (id === 'setup' && G.mp) mpLeave(); if (id === 'setup' && MP_ON && typeof homeRefresh === 'function') homeRefresh(); for (const s of ['setup', 'sandbox', 'lab', 'cup', 'online', 'lobby', 'auction', 'results']) $('#' + s).hidden = s !== id; window.scrollTo(0, 0); }
 
 
 // ----- banco de narração (sem números; {q}=QB {r}=RB {w}=WR {e}=TE {t}=tackle {g}=guard {c}=center | defesa: {ed}{dt}{lb}{cb} | {O}=ataque {D}=defesa {oc}=cidade do ataque) -----
@@ -562,16 +562,17 @@ function fieldHTML(side, rows, o) {
   const cells = sp.map(([pos, i, x, y]) => {
     const r = by[pos][i], want = o.cur && !r.p && o.cur.pos === pos, isNew = o.newId != null && r.p && r.p.id === o.newId, lk = r.p && o.linked && o.linked.has(r.p.id);
     const logo = r.p ? badge(frIdx(r.p), 34) : '<span class="plus">+</span>';
-    return `<div class="tk ${side} ${r.p ? '' : 'empty'} ${want ? 'want' : ''} ${isNew ? 'new' : ''} ${lk ? 'lk' : ''}" data-id="${r.p ? r.p.id : ''}" style="left:${(x - x0 + .6) / span * 100}%;top:calc(${y} * var(--rh));width:${100 / span}%${lk ? ';--tc:' + EMB[frIdx(r.p)][1] : ''}"><div class="r"><span class="c">${logo}</span><span class="ov num">${r.p ? r.p.ovr : ''}</span></div><small>${r.p ? esc(shortName(r.p.name)) : ''}</small><b>${pos}${WEIGHT[pos] > 1 ? `<em>${nf(WEIGHT[pos])}x</em>` : ''}</b></div>`;
+    return `<div class="tk ${side} ${r.p ? '' : 'empty'} ${want ? 'want' : ''} ${isNew ? 'new' : ''} ${lk ? 'lk' : ''} ${o.sel && o.sel.pos === pos && o.sel.i === i ? 'sel' : ''}" data-pos="${pos}" data-i="${i}" data-id="${r.p ? r.p.id : ''}" style="left:${(x - x0 + .6) / span * 100}%;top:calc(${y} * var(--rh));width:${100 / span}%${lk ? ';--tc:' + EMB[frIdx(r.p)][1] : ''}"><div class="r"><span class="c">${logo}</span><span class="ov num">${r.p ? r.p.ovr : ''}</span></div><small>${r.p ? esc(shortName(r.p.name)) : ''}</small><b>${pos}${WEIGHT[pos] > 1 ? `<em>${nf(WEIGHT[pos])}x</em>` : ''}</b></div>`;
   });
   const got = rows.filter(r => r.p).length;
   const sy = o.syn && o.syn[side] ? `<span class="sy">${t('Sinergia')} +${nf(o.syn[side].toFixed(1))}</span>` : '', up = o.up && o.up[side] ? `<span class="sy up">${t('Esse lote liga com seu time')}</span>` : '';
   return `<div class="fld"><div class="fh"><span>${t(side === 'off' ? 'ATAQUE' : 'DEFESA')} ${sy}</span>${up}<span class="num">${got}/8</span></div><div class="fg" style="--rows:${rowsN}">${cells.join('')}</div></div>`;
 }
 // linhas de sinergia estilo FIFA: ligam os titulares do mesmo time da NFL, na cor do time
-function drawLinks(links) {
+function drawLinks(links, root) {
+  root = root || '#fm';
   const run = () => ['off', 'def'].forEach((sd, k) => {
-    const fg = $('#fm').querySelectorAll('.fg')[k]; if (!fg || !links[sd].length) return;
+    const fg = $(root).querySelectorAll('.fg')[k]; if (!fg || !links[sd].length) return;
     const R0 = fg.getBoundingClientRect(), pt = id => { const c = fg.querySelector(`.tk[data-id="${id}"] .c`); if (!c) return null; const b = c.getBoundingClientRect(); return [b.left + b.width / 2 - R0.left, b.top + b.height / 2 - R0.top]; };
     let svg = '';
     for (const l of links[sd]) { const a = pt(l.a.id), b = pt(l.b.id); if (!a || !b) continue; const col = EMB[frIdx(l.a)][1];
@@ -597,6 +598,60 @@ function paintLineup() {
   drawLinks(links);
   $('#lst').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE')}</div>${off.map(r => slotHTML(r, o)).join('')}<div class="sub">${t('DEFESA')}</div>${def.map(r => slotHTML(r, o)).join('')}`;
 }
+
+// ---------- SANDBOX: monte o elenco sem leilão, sem dinheiro ----------
+const SB = { roster: [], pos: 'QB', q: '', sel: null, ready: false };
+const sbPool = () => DB.map((p, i) => p.id != null ? p : (p.id = i, p));
+function sbRoster(add, rm) {            // elenco hipotético com um jogador a mais e/ou a menos
+  let r = SB.roster.filter(p => !rm || p.id !== rm.id); if (add) r = r.concat([add]); return r;
+}
+function sbPick(p) {
+  const have = SB.roster.find(x => x.id === p.id);
+  if (have) { SB.roster = SB.roster.filter(x => x.id !== p.id); SB.sel = null; return; }
+  const same = SB.roster.filter(x => x.pos === p.pos);
+  if (same.length >= SLOTS[p.pos]) {   // posição cheia: troca o jogador selecionado no campo, ou o mais fraco
+    const tgt = (SB.sel && SB.sel.pos === p.pos && lineupRows(SB.roster).filter(r => r.pos === p.pos)[SB.sel.i] || {}).p || same.slice().sort((a, b) => a.ovr - b.ovr)[0];
+    SB.roster = SB.roster.filter(x => x.id !== tgt.id);
+  }
+  SB.roster.push(p); SB.sel = null;
+}
+function paintSandbox() {
+  const rows = lineupRows(SB.roster), L = lineup(SB.roster);
+  const off = rows.filter(r => OFF_POS.includes(r.pos)), def = rows.filter(r => !OFF_POS.includes(r.pos));
+  const links = { off: synLinks(L, 'off'), def: synLinks(L, 'def') }, o = { sel: SB.sel, linked: new Set(), syn: { off: synPts(links.off), def: synPts(links.def) } };
+  ['off', 'def'].forEach(sd => links[sd].forEach(l => { o.linked.add(l.a.id); o.linked.add(l.b.id); }));
+  const full = SB.roster.length === TOTAL_SLOTS, rt = ratings(L), f = x => nf(x.toFixed(1));
+  $('#sb-stats').innerHTML = `<div><b class="num">${full ? f(rt.all) : '–'}</b><span>OVR</span></div><div><b class="num">${SB.roster.length ? f(rt.off) : '–'}</b><span>${t('ATAQUE')}</span></div><div><b class="num">${SB.roster.length ? f(rt.def) : '–'}</b><span>${t('DEFESA')}</span></div><div class="sy"><b class="num">+${f(o.syn.off + o.syn.def)}</b><span>${t('Sinergia')}</span></div>`;
+  $('#sb-fm').innerHTML = fieldHTML('off', off, o) + fieldHTML('def', def, o);
+  drawLinks(links, '#sb-fm');
+  $('#sb-tabs').innerHTML = POS_ORDER.map(p => `<button type="button" data-p="${p}" class="${SB.pos === p ? 'on' : ''}" role="tab">${p}<small>${SB.roster.filter(x => x.pos === p).length}/${SLOTS[p]}</small></button>`).join('');
+  const q = SB.q.trim().toLowerCase(), base = rt.all, side = OFF_POS.includes(SB.pos) ? 'off' : 'def';
+  const list = sbPool().filter(p => p.pos === SB.pos && (!q || p.name.toLowerCase().includes(q) || frName(p).toLowerCase().includes(q) || p.tm.toLowerCase() === q)).sort((a, b) => b.ovr - a.ovr).slice(0, 60);
+  const cur = SB.roster.length ? synPts(links[side]) : 0;
+  $('#sb-list').innerHTML = list.map(p => {
+    const inn = SB.roster.some(x => x.id === p.id); let g = '';
+    if (!inn) {                           // quanto o lado ganha de sinergia se ele entrar
+      const same = SB.roster.filter(x => x.pos === SB.pos), tgt = same.length >= SLOTS[SB.pos] ? (same.slice().sort((a, b) => a.ovr - b.ovr)[0]) : null;
+      const d = synPts(synLinks(lineup(sbRoster(p, tgt)), side)) - cur;
+      if (d > 0.04) g = `<span class="g">✦ +${f(d)}</span>`;
+    }
+    return `<button type="button" class="sbr ${inn ? 'in' : ''}" data-id="${p.id}">${badge(frIdx(p), 32)}<span class="n"><b>${esc(p.name)}</b><small>${esc(frName(p))}</small></span>${g || '<span class="g"></span>'}<span class="o num">${inn ? '✓' : p.ovr}</span></button>`;
+  }).join('') || `<p class="note">${t('Nenhum jogador encontrado.')}</p>`;
+}
+function openSandbox() { show('sandbox'); paintSandbox(); }
+$('#go-sandbox').onclick = openSandbox;
+$('#sb-back').onclick = () => show('setup');
+$('#sb-clear').onclick = () => { SB.roster = []; SB.sel = null; paintSandbox(); };
+$('#sb-q').oninput = e => { SB.q = e.target.value; paintSandbox(); };
+$('#sb-tabs').onclick = e => { const b = e.target.closest('[data-p]'); if (!b) return; SB.pos = b.dataset.p; SB.sel = null; paintSandbox(); };
+$('#sb-fm').onclick = e => {
+  const k = e.target.closest('.tk'); if (!k) return;
+  const again = k.dataset.id && SB.sel && SB.sel.pos === k.dataset.pos && SB.sel.i === +k.dataset.i;   // tocou de novo num titular selecionado: remove
+  if (again) { SB.roster = SB.roster.filter(x => x.id !== +k.dataset.id); SB.sel = null; paintSandbox(); return; }
+  SB.pos = k.dataset.pos; SB.sel = { pos: k.dataset.pos, i: +k.dataset.i }; paintSandbox();
+  $('#sb-tabs').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+};
+$('#sb-list').onclick = e => { const b = e.target.closest('[data-id]'); if (!b) return; sbPick(sbPool().find(p => p.id === +b.dataset.id)); paintSandbox(); };
 function openPosInfo() {
   const row = s => ([p, n, q, d]) => `<div class="pi"><span class="pos ${s}">${p}</span><div><b>${n}<em>${tpl('{n} vaga', '{n} vagas', q)} · ${nf(WEIGHT[p].toFixed(2).replace(/0$/, ''))}x</em></b><p>${t(d)}</p></div></div>`;
   $('#posinfo-b').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE · tem a bola')}</div>${POSINFO.off.map(row('off')).join('')}<div class="sub">${t('DEFESA · tenta tomar a bola')}</div>${POSINFO.def.map(row('def')).join('')}<p class="sh-n">${t('O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR, LB e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.')}</p><p class="sh-n">${t('Sinergia: dois titulares do mesmo time da NFL, do mesmo lado e lado a lado no campo ganham uma linha na cor do time e somam pontos no OVR (QB + WR = +1,0; RB + QB ≈ +0,9; linha com linha = +0,5), até +4 por lado. Quem está longe um do outro não se conecta.')}</p>`;
