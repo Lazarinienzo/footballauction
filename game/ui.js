@@ -289,7 +289,7 @@ function paintLobby() {
   const others = L.mp ? mpOthers() : L.bots, n = others.length + 1;
   $('#lb-prev').innerHTML = badge(L.emb, 76); anim($('#lb-prev'), 'pop');
   $('#lb-prevname').textContent = L.name || t('Seu Time');
-  $('#lb-prevemb').textContent = L.auto ? t('Franquia fictícia') : emN(L.emb);
+  $('#lb-prevemb').textContent = L.auto ? t('Franquia') : emN(L.emb);
   // grade de escudos: os já escolhidos ficam apagados
   const ownerOf = {}; others.forEach(b => ownerOf[b.emb] = b.name);
   const parts = n => { const k = n.lastIndexOf(' '); return [n.slice(0, k), n.slice(k + 1)]; };

@@ -372,3 +372,7 @@ Object.assign(I18N.en, {
   'Mandar o convite da sala': 'Send the room invite',
   'Bora disputar um leilão de NFL? Entra na minha sala {c} no Touchdown Auction: cada um tem US$ 200 pra montar 16 titulares.': 'Up for an NFL auction? Join my room {c} on Touchdown Auction: everyone gets $200 to build a 16-man starting lineup.'
 });
+Object.assign(I18N.en, {
+  'Franquias inspiradas nos times da NFL. Você pode renomear o time.': 'Franchises inspired by NFL teams. You can rename the team.',
+  'Franquia': 'Franchise'
+});

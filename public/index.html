@@ -851,7 +851,7 @@ html,body{overflow-x:hidden}
   <div class="card mine">
     <div class="preview"><span id="lb-prev"></span><div><small>SEU TIME</small><b id="lb-prevname"></b><em id="lb-prevemb"></em></div></div>
     <div class="field"><label for="lb-name">Nome do time</label><input id="lb-name" maxlength="44" autocomplete="off"></div>
-    <div class="field"><label>Franquia e símbolo</label><div class="emgrid" id="lb-grid"></div><p class="note" style="margin-top:10px">Paródias inventadas, inspiradas nos times da NFL. Você pode renomear o time.</p></div>
+    <div class="field"><label>Franquia e símbolo</label><div class="emgrid" id="lb-grid"></div><p class="note" style="margin-top:10px">Franquias inspiradas nos times da NFL. Você pode renomear o time.</p></div>
   </div>
 
   </div>
@@ -1760,6 +1760,10 @@ Object.assign(I18N.en, {
   'Mandar o convite da sala': 'Send the room invite',
   'Bora disputar um leilão de NFL? Entra na minha sala {c} no Touchdown Auction: cada um tem US$ 200 pra montar 16 titulares.': 'Up for an NFL auction? Join my room {c} on Touchdown Auction: everyone gets $200 to build a 16-man starting lineup.'
 });
+Object.assign(I18N.en, {
+  'Franquias inspiradas nos times da NFL. Você pode renomear o time.': 'Franchises inspired by NFL teams. You can rename the team.',
+  'Franquia': 'Franchise'
+});
 const MP_ON = true;      // o build online troca por true (precisa do servidor Cloudflare)
 // ---------- interface ----------
 const $ = s => document.querySelector(s);
@@ -2051,7 +2055,7 @@ function paintLobby() {
   const others = L.mp ? mpOthers() : L.bots, n = others.length + 1;
   $('#lb-prev').innerHTML = badge(L.emb, 76); anim($('#lb-prev'), 'pop');
   $('#lb-prevname').textContent = L.name || t('Seu Time');
-  $('#lb-prevemb').textContent = L.auto ? t('Franquia fictícia') : emN(L.emb);
+  $('#lb-prevemb').textContent = L.auto ? t('Franquia') : emN(L.emb);
   // grade de escudos: os já escolhidos ficam apagados
   const ownerOf = {}; others.forEach(b => ownerOf[b.emb] = b.name);
   const parts = n => { const k = n.lastIndexOf(' '); return [n.slice(0, k), n.slice(k + 1)]; };
