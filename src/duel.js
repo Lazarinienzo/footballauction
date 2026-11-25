@@ -1,6 +1,6 @@
 // Uma sala de Duelo (1 contra 1): cartas viradas, posição por posição. O servidor manda; cada jogador só recebe as cartas que já foram viradas.
 import { DurableObject } from 'cloudflare:workers';
-import { DB, Duelo, DU_TURN_MS } from './engine.js';
+import { DB, Duelo, DU_TURN_MS, DU_EXTRA } from './engine.js';
 
 const EMB_N = 32, AWAY_MS = 12000, NEXT_MS = 700;
 const clean = s => String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 44);
@@ -74,9 +74,10 @@ export class Duel extends DurableObject {
   pushWait() { for (const c of this.conns) if (c.seat) this.send(c, { t: 'dwait', code: this.code, show: this.show, host: this.idx(c.seat) === 0, you: this.idx(c.seat), seats: this.info() }); }
   begin() {
     this.G = new Duelo(DB, { show: this.show, first: Math.random() < .5 ? 0 : 1 }); this.phase = 'play'; this.again = new Set(); this.seed = seedNow();
-    this.seats.forEach(s => { s.awayAt = s.c ? 0 : Date.now(); }); this.turn(); this.pushAll();
+    this.seats.forEach(s => { s.awayAt = s.c ? 0 : Date.now(); }); this.turn(DU_EXTRA.first); this.pushAll();
   }
-  turn() { this.deadline = Date.now() + DU_TURN_MS; }
+  turn(extra) { this.deadline = Date.now() + DU_TURN_MS + (extra || 0); }
+  extra(r, cur) { const G = this.G; return G.r !== r ? DU_EXTRA.round : G.cur !== cur ? DU_EXTRA.swap : 0; }
   view(c) {
     const p = this.idx(c.seat), G = this.G;
     return { t: 'd', you: p, ph: this.phase, code: this.code, ...G.view(p), left: Math.max(0, this.deadline - Date.now()), seed: G.done ? this.seed : null, seats: this.info(), again: [...this.again] };
@@ -87,7 +88,7 @@ export class Duel extends DurableObject {
     const G = this.G, p = this.idx(s), cur = G.cur, r = G.r;
     const ok = m.t === 'flip' ? G.flip(p, m.i) : m.t === 'pick' ? G.pick(p, m.i) : G.confirm(p);
     if (!ok) { const c = s.c; if (c) this.send(c, this.view(c)); return; }
-    if (G.cur !== cur || G.r !== r) this.turn();
+    const x = this.extra(r, cur); if (x) this.turn(x);
     this.afterMove();
   }
   afterMove() {
@@ -97,7 +98,7 @@ export class Duel extends DurableObject {
   step() {
     if (this.phase !== 'play') return;
     const G = this.G, now = Date.now(), cur = G.cur, s = this.seats[cur], gone = s && !s.c && now - s.awayAt > AWAY_MS;
-    if (now >= this.deadline || gone) { const r = G.r; G.auto(cur); this.turn(); if (gone) this.deadline = now + 1500; this.afterMove(); void r; }
+    if (now >= this.deadline || gone) { const r = G.r; G.auto(cur); this.turn(this.extra(r, cur)); if (gone) this.deadline = now + 1500; this.afterMove(); }
   }
   startHousekeeping() {
     this.timers.push(setInterval(() => this.step(), 500));

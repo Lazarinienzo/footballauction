@@ -504,3 +504,16 @@ Object.assign(I18N.en, {
  "Tackle defensivo": "Defensive tackle",
  "O duelo dessa sala já começou.": "The duel in this room has already started."
 });
+
+Object.assign(I18N.en, {
+ "Mesa de {n}": "{n}'s table",
+ "{n} está virando as cartas…": "{n} is flipping cards…",
+ "{n} está escolhendo…": "{n} is choosing…",
+ "{n} escolheu.": "{n} chose.",
+ "Você escolheu.": "You chose.",
+ "As cartas estão chegando…": "The cards are coming in…",
+ "Sorteando a posição…": "Drawing the position…",
+ "Bronze": "Bronze",
+ "Ouro": "Gold",
+ "Diamante": "Diamond"
+});

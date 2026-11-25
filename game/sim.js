@@ -514,8 +514,9 @@ function simSeason(teams, confs) {
 // ---------- modo Duelo (1 contra 1): cartas viradas, posição por posição ----------
 // Cada rodada sorteia uma posição. Cada jogador tem o SEU tabuleiro de n cartas (as mesmas pessoas podem aparecer nos dois). Vira f às cegas e escolhe k entre as viradas.
 // Quem começa alterna a cada rodada; quem joga depois vê o que o outro virou. Formação padrão pros dois.
-const DU_CFG = { QB: { n: 5, f: 3, k: 1 }, RB: { n: 5, f: 3, k: 1 }, WR: { n: 5, f: 3, k: 2 }, TE: { n: 5, f: 3, k: 1 }, OL: { n: 6, f: 4, k: 3 }, EDGE: { n: 5, f: 3, k: 2 }, DT: { n: 5, f: 3, k: 2 }, LB: { n: 5, f: 3, k: 2 }, CB: { n: 5, f: 3, k: 2 } };
+const DU_CFG = { QB: { n: 6, f: 3, k: 1 }, RB: { n: 6, f: 3, k: 1 }, WR: { n: 6, f: 3, k: 2 }, TE: { n: 6, f: 3, k: 1 }, OL: { n: 6, f: 4, k: 3 }, EDGE: { n: 6, f: 3, k: 2 }, DT: { n: 6, f: 3, k: 2 }, LB: { n: 6, f: 3, k: 2 }, CB: { n: 6, f: 3, k: 2 } };
 const DU_TURN_MS = 30000;
+const DU_EXTRA = { first: 7500, round: 10500, swap: 5500 };   // tempo extra no relógio do turno pras animações (sorteio, cartas entrando e saindo da mesa)
 class Duelo {
   constructor(db, o) {
     o = o || {}; this.db = db.map((p, i) => ({ ...p, id: i })); this.show = !!o.show;
@@ -564,4 +565,4 @@ class Duelo {
 }
 function duelGame(teams, seed) { return withSeed(seed, () => simGame(teams[0], teams[1], { noTie: true })); }
 
-if (typeof module !== 'undefined') module.exports = { SPOT, FORMS, STD, BENCH_TOTAL, FW, wOf, feasible, canForm, mand, freeSlots, formSlots, cfgTeam, validForm, SYN_W, SYN_CAP, synLinks, synInfo, normOrder, autoPlan, sideStarters, WEIGHT, SIM, POSSESSIONS, pTD, pFG, driveOdds, TAKE, SLOTS, POS_ORDER, OFF_POS, TOTAL_SLOTS, BUDGET, lineup, ratings, simGame, Auction, newBot, maxTeams, makePool, finishTeam, simSeason, drawConferences, buildTables, makeRounds, confName, qualifiers, MIN_TEAMS, MAX_CONF, need, slotsLeft, maxBid, duel, shortName, withSeed, mulberry32, rint, R, Duelo, duelGame, DU_CFG, DU_TURN_MS };
+if (typeof module !== 'undefined') module.exports = { SPOT, FORMS, STD, BENCH_TOTAL, FW, wOf, feasible, canForm, mand, freeSlots, formSlots, cfgTeam, validForm, SYN_W, SYN_CAP, synLinks, synInfo, normOrder, autoPlan, sideStarters, WEIGHT, SIM, POSSESSIONS, pTD, pFG, driveOdds, TAKE, SLOTS, POS_ORDER, OFF_POS, TOTAL_SLOTS, BUDGET, lineup, ratings, simGame, Auction, newBot, maxTeams, makePool, finishTeam, simSeason, drawConferences, buildTables, makeRounds, confName, qualifiers, MIN_TEAMS, MAX_CONF, need, slotsLeft, maxBid, duel, shortName, withSeed, mulberry32, rint, R, Duelo, duelGame, DU_CFG, DU_TURN_MS, DU_EXTRA };
