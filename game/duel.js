@@ -212,7 +212,7 @@ function dtShow(tg, anim) {
   if (anim) dtAt(ready, c.n * T_DEALK + T_DEAL); else ready();
 }
 function dtFront(id) {
-  const p = duP(id), tier = duTier(p.ovr);
+  const p = duP(id), tier = DU.show ? duTier(p.ovr) : 'plain';
   return [`face fft t-${tier}`, `${badge(frIdx(p), 46)}<span class="dn">${esc(p.name)}</span><span class="dp">${p.pos} · ${esc(p.tm)}</span><span class="dov num">${DU.show ? p.ovr : '??'}</span><i class="ck">✓</i>`];
 }
 // carta 90+ virada: brilho, explosão de faíscas e faixa "DIAMANTE" na mesa
@@ -243,7 +243,7 @@ function dtUpdate() {
     ? (side.ok ? t('Você escolheu.') : flipping ? tpl('Sua vez: vire {n} carta.', 'Sua vez: vire {n} cartas.', c.f - side.fl.length) : t('Escolha {k} das {f} cartas viradas.', { k: c.k, f: c.f }))
     : (side.ok ? t('{n} escolheu.', { n: duSeat(d.who).name }) : flipping ? t('{n} está virando as cartas…', { n: duSeat(d.who).name }) : t('{n} está escolhendo…', { n: duSeat(d.who).name }));
   $('#dt-act').innerHTML = canPick ? `<button class="btn full" id="du-ok" ${side.sel.length === c.k ? '' : 'disabled'} style="margin-top:12px">${t('Confirmar')} (${side.sel.length}/${c.k})</button>` : '';
-  $('#dt-leg').innerHTML = `<i class="tdot b"></i>${t('Bronze')} 70–79 <i class="tdot g"></i>${t('Ouro')} 80–89 <i class="tdot d"></i>${t('Diamante')} 90+`;
+  $('#dt-leg').innerHTML = DU.show ? `<i class="tdot b"></i>${t('Bronze')} 70–79 <i class="tdot g"></i>${t('Ouro')} 80–89 <i class="tdot d"></i>${t('Diamante')} 90+` : '';
   duTickUI();
 }
 // a escolha fica na mesa um instante, depois as cartas saem
