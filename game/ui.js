@@ -411,6 +411,43 @@ const sfx = {
     o.frequency.value = n <= 1 ? 1500 : n <= 3 ? 1100 : 880; g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(n <= 1 ? .5 : n <= 3 ? .38 : .28, t0 + .006); g.gain.exponentialRampToValueAtTime(.001, t0 + .14);
     o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + .16);
   },
+  // carta virando no Duelo. Bronze (ou OVR escondido): toque simples. Ouro: toque + sininho. Diamante: fanfarra com brilho e eco.
+  flip(tier) {
+    if (!sfx.on || !sfx.ctx) return; if (sfx.ctx.state !== 'running') { sfx.ctx.resume().catch(() => { }); return; }
+    const nw = performance.now(); if (nw - (sfx.lastFlip || 0) < 90) return; sfx.lastFlip = nw;
+    const c = sfx.ctx, t0 = c.currentTime + .02, out = c.createGain(); out.gain.value = .9; out.connect(c.destination);
+    if (!sfx.nb) { sfx.nb = c.createBuffer(1, c.sampleRate, c.sampleRate); const d = sfx.nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+    let wet = null;
+    if (tier === 'diamond' || tier === 'gold') {          // eco curtinho
+      const dl = c.createDelay(.5), fb = c.createGain(), lp = c.createBiquadFilter(), wg = c.createGain();
+      dl.delayTime.value = tier === 'diamond' ? .17 : .12; fb.gain.value = tier === 'diamond' ? .42 : .28; lp.type = 'lowpass'; lp.frequency.value = 3200; wg.gain.value = tier === 'diamond' ? .5 : .3;
+      wet = c.createGain(); wet.connect(dl); dl.connect(lp); lp.connect(fb); fb.connect(dl); lp.connect(wg); wg.connect(c.destination);
+    }
+    const tone = (f, at, dur, v, type, f2) => {
+      const o = c.createOscillator(), g = c.createGain(); o.type = type || 'sine'; o.frequency.setValueAtTime(f, t0 + at); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + at + dur);
+      g.gain.setValueAtTime(0, t0 + at); g.gain.linearRampToValueAtTime(v, t0 + at + .012); g.gain.exponentialRampToValueAtTime(.001, t0 + at + dur);
+      o.connect(g); g.connect(out); if (wet) g.connect(wet); o.start(t0 + at); o.stop(t0 + at + dur + .05);
+    };
+    const swish = (at, dur, f0, f1, v) => {
+      const n = c.createBufferSource(), bp = c.createBiquadFilter(), g = c.createGain(); n.buffer = sfx.nb; n.loop = true; bp.type = 'bandpass'; bp.Q.value = 1.1;
+      bp.frequency.setValueAtTime(f0, t0 + at); bp.frequency.exponentialRampToValueAtTime(f1, t0 + at + dur);
+      g.gain.setValueAtTime(0, t0 + at); g.gain.linearRampToValueAtTime(v, t0 + at + dur * .35); g.gain.exponentialRampToValueAtTime(.001, t0 + at + dur);
+      n.connect(bp); bp.connect(g); g.connect(out); n.start(t0 + at, Math.random() * .5); n.stop(t0 + at + dur + .05);
+    };
+    if (tier === 'diamond') {
+      swish(0, .4, 600, 5200, .32);
+      tone(120, .5, .7, .55, 'sine', 48);                                                     // pancada grave
+      [523.25, 659.25, 783.99, 1046.5, 1318.5, 1568].forEach((f, k) => { tone(f, .56 + k * .085, .9, .2, 'sine'); tone(f * 2, .56 + k * .085, .5, .07, 'sine'); });   // arpejo cintilante
+      [523.25, 659.25, 783.99, 1046.5].forEach(f => { tone(f, 1.08, 1.5, .11, 'triangle'); });   // acorde final
+      for (let k = 0; k < 7; k++) swish(.6 + k * .14 + Math.random() * .06, .12, 6500, 9500, .06);   // brilhos
+    } else if (tier === 'gold') {
+      swish(0, .24, 700, 3400, .2);
+      tone(659.25, .17, .4, .24, 'triangle'); tone(987.77, .27, .6, .24, 'sine'); tone(1975.5, .27, .35, .06, 'sine');
+    } else {
+      swish(0, .18, 650, 2600, .2);
+      tone(220, .02, .12, .22, 'sine', 150);
+    }
+  },
   paint() { const b = $('#a-snd'); if (b) { b.classList.toggle('off', !sfx.on); b.setAttribute('aria-pressed', String(sfx.on)); b.setAttribute('aria-label', t(sfx.on ? 'Som ligado' : 'Som desligado')); } }
 };
 ['pointerup', 'touchend', 'click', 'keydown'].forEach(ev => document.addEventListener(ev, sfx.unlock, { passive: true }));   // no celular só pointerup/touchend/click contam como toque pra liberar o áudio

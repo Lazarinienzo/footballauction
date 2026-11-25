@@ -8,7 +8,7 @@ const seedNow = () => (Math.random() * 2 ** 32) >>> 0;
 
 export class Duel extends DurableObject {
   constructor(ctx, env) { super(ctx, env); this.conns = new Set(); this.timers = []; this.init(); }
-  init() { Object.assign(this, { created: false, phase: 'wait', seats: [], show: false, G: null, seed: 0, deadline: 0, code: '', active: Date.now(), emptyAt: 0, again: new Set() }); }
+  init() { Object.assign(this, { created: false, phase: 'wait', seats: [], show: false, G: null, seed: 0, deadline: 0, code: '', active: Date.now(), emptyAt: 0, again: new Set(), playN: 0 }); }
 
   async fetch(req) {
     this.code = new URL(req.url).pathname.split('/').pop().toUpperCase();
@@ -34,8 +34,11 @@ export class Duel extends DurableObject {
     switch (m.t) {
       case 'ping': return this.send(c, { t: 'pong' });
       case 'leave': return this.leave(s);
-      case 'opt': if (this.phase === 'wait' && this.idx(s) === 0) { this.show = !!m.show; this.pushWait(); } return;
-      case 'start': if (this.phase === 'wait' && this.idx(s) === 0 && this.seats.length === 2) this.begin(); return;
+      case 'opt': if (this.phase === 'wait' && this.idx(s) === 0) { this.show = !!m.show; this.seats.forEach(x => { x.ready = false; }); this.pushWait(); } return;
+      case 'me': if (this.phase === 'wait') this.setMe(s, m); return;
+      case 'ready': if (this.phase === 'wait' && this.idx(s) > 0) { s.ready = !!m.v; this.pushWait(); } return;
+      case 'start': if (this.phase === 'wait' && this.idx(s) === 0 && this.seats.length === 2 && this.seats[1].ready) this.begin(); return;
+      case 'play': if (this.phase === 'done') { this.playN++; this.pushAll(); } return;
       case 'again': if (this.phase === 'done') { this.again.add(this.idx(s)); if (this.again.size >= 2 || this.seats.some(x => !x.c)) { this.begin(); } else this.pushAll(); } return;
       case 'flip': case 'pick': case 'ok': return this.play(s, m);
     }
@@ -58,7 +61,7 @@ export class Duel extends DurableObject {
       if (this.seats.length >= 2) return this.send(c, { t: 'err', code: 'full' });
       let emb = Number.isInteger(m.emb) && m.emb >= 0 && m.emb < EMB_N ? m.emb : 0;
       if (this.seats.some(x => x.emb === emb)) emb = [...Array(EMB_N).keys()].find(e => !this.seats.some(x => x.emb === e));
-      s = { tok, name: clean(m.name), emb, c, awayAt: 0 }; this.seats.push(s); c.seat = s;
+      s = { tok, name: clean(m.name), emb, c, awayAt: 0, ready: false }; this.seats.push(s); c.seat = s;
     }
     this.active = Date.now();
     if (this.phase === 'wait') this.pushWait(); else this.pushAll();
@@ -70,17 +73,23 @@ export class Duel extends DurableObject {
     } else { s.awayAt = Date.now() - AWAY_MS; if (s.c) { s.c.seat = null; try { s.c.ws.close(1000, 'saiu'); } catch (e) { } this.conns.delete(s.c); s.c = null; } this.pushAll(); }
   }
 
-  info() { return this.seats.map(s => ({ name: s.name, emb: s.emb, on: !!s.c })); }
+  // cada jogador acerta o próprio nome e escudo no lobby (o escudo não pode repetir o do rival)
+  setMe(s, m) {
+    s.name = clean(m.name);
+    if (Number.isInteger(m.emb) && m.emb >= 0 && m.emb < EMB_N && !this.seats.some(x => x !== s && x.emb === m.emb)) s.emb = m.emb;
+    this.pushWait();
+  }
+  info() { return this.seats.map((s, i) => ({ name: s.name, emb: s.emb, on: !!s.c, ready: i === 0 ? true : !!s.ready })); }
   pushWait() { for (const c of this.conns) if (c.seat) this.send(c, { t: 'dwait', code: this.code, show: this.show, host: this.idx(c.seat) === 0, you: this.idx(c.seat), seats: this.info() }); }
   begin() {
-    this.G = new Duelo(DB, { show: this.show, first: Math.random() < .5 ? 0 : 1 }); this.phase = 'play'; this.again = new Set(); this.seed = seedNow();
+    this.G = new Duelo(DB, { show: this.show, first: Math.random() < .5 ? 0 : 1 }); this.phase = 'play'; this.again = new Set(); this.playN = 0; this.seed = seedNow();
     this.seats.forEach(s => { s.awayAt = s.c ? 0 : Date.now(); }); this.turn(DU_EXTRA.first); this.pushAll();
   }
   turn(extra) { this.deadline = Date.now() + DU_TURN_MS + (extra || 0); }
   extra(r, cur) { const G = this.G; return G.r !== r ? DU_EXTRA.round : G.cur !== cur ? DU_EXTRA.swap : 0; }
   view(c) {
     const p = this.idx(c.seat), G = this.G;
-    return { t: 'd', you: p, ph: this.phase, code: this.code, ...G.view(p), left: Math.max(0, this.deadline - Date.now()), seed: G.done ? this.seed : null, seats: this.info(), again: [...this.again] };
+    return { t: 'd', you: p, ph: this.phase, code: this.code, ...G.view(p), left: Math.max(0, this.deadline - Date.now()), seed: G.done ? this.seed : null, seats: this.info(), again: [...this.again], play: this.playN };
   }
   pushAll() { if (!this.G) return this.pushWait(); for (const c of this.conns) if (c.seat) this.send(c, this.view(c)); }
   play(s, m) {

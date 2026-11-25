@@ -521,3 +521,10 @@ Object.assign(I18N.en, {
 Object.assign(I18N.en, {'DIAMANTE': 'DIAMOND'});
 
 Object.assign(I18N.en, {'o time': 'the team', 'Som': 'Sound', '16 vagas': '16 spots'});
+
+Object.assign(I18N.en, {
+  'Seu time': 'Your team', 'Ajeitem os times.': 'Set up your teams.', 'pronto': 'ready', 'ajustando…': 'setting up…',
+  'Estou pronto': "I'm ready", 'Pronto! Toque pra desfazer': 'Ready! Tap to undo',
+  'Ajuste seu nome e escudo e marque pronto.': 'Set your name and crest, then tap ready.',
+  'Aguardando {n} ficar pronto…': 'Waiting for {n} to get ready…'
+});
