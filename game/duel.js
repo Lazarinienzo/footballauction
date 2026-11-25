@@ -284,6 +284,8 @@ function duTickUI() {
   const v = DU.v; if (!v) return; if (DU.mode === 'solo') duLocalTimeout();
   const bar = $('#du-bar'), tm = $('#du-time'); if (!bar || !tm || v.done) return;
   const ms = Math.max(0, Math.min(DU_TURN_MS, DU.deadline - Date.now())); bar.style.width = (100 * ms / DU_TURN_MS).toFixed(1) + '%'; bar.classList.toggle('low', ms < 8000); tm.textContent = Math.ceil(ms / 1000);
+  const n = Math.ceil(ms / 1000);                                  // cronômetro: tique a cada segundo nos últimos 10 s, só na sua vez
+  if (dtCan() && n >= 1 && n <= 10) { if (DU.tickN !== n) { DU.tickN = n; sfx.tick(n); } } else DU.tickN = 0;
 }
 
 function duTeamsFor(v) {
