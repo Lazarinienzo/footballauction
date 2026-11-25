@@ -560,13 +560,27 @@ function fieldHTML(side, rows, o) {
   const by = {}; rows.forEach(r => (by[r.pos] = by[r.pos] || []).push(r));
   const tk = (pos, i, r, c) => {
     const x = by[pos][i], want = o.cur && !x.p && o.cur.pos === pos, isNew = o.newId != null && x.p && x.p.id === o.newId;
-    return `<div class="tk ${side} ${x.p ? '' : 'empty'} ${want ? 'want' : ''} ${isNew ? 'new' : ''}" style="--r:${r};--c:${c}"><span class="c num">${x.p ? x.p.ovr : '+'}${WEIGHT[pos] > 1 ? `<i class="w">${nf(WEIGHT[pos])}x</i>` : ''}</span><b>${pos}</b><small>${x.p ? esc(shortName(x.p.name)) : ''}</small></div>`;
+    const lk = x.p && o.linked && o.linked.has(x.p.id);
+    return `<div class="tk ${side} ${x.p ? '' : 'empty'} ${want ? 'want' : ''} ${isNew ? 'new' : ''} ${lk ? 'lk' : ''}" data-id="${x.p ? x.p.id : ''}" style="--r:${r};--c:${c}${lk ? ';--tc:' + EMB[frIdx(x.p)][1] : ''}"><span class="c num">${x.p ? x.p.ovr : '+'}${WEIGHT[pos] > 1 ? `<i class="w">${nf(WEIGHT[pos])}x</i>` : ''}</span><b>${pos}</b><small>${x.p ? esc(shortName(x.p.name)) : ''}</small></div>`;
   };
   const cells = side === 'off'
     ? [tk('WR', 0, 1, 1), tk('OL', 0, 1, 2), tk('OL', 1, 1, 3), tk('OL', 2, 1, 4), tk('TE', 0, 1, 5), tk('WR', 1, 1, 6), tk('QB', 0, 2, 4), tk('RB', 0, 3, 4)]
     : [tk('CB', 0, 1, 1), tk('CB', 1, 1, 6), tk('LB', 0, 2, 3), tk('LB', 1, 2, 4), tk('EDGE', 0, 3, 2), tk('DT', 0, 3, 3), tk('DT', 1, 3, 4), tk('EDGE', 1, 3, 5)];
   const got = rows.filter(r => r.p).length;
-  return `<div class="fld"><div class="fh"><span>${t(side === 'off' ? 'ATAQUE' : 'DEFESA')}</span><span class="num">${got}/8</span></div><div class="fg">${cells.join('')}<i class="los" style="grid-row:${side === 'off' ? 2 : 3}"></i></div></div>`;
+  const sy = o.syn && o.syn[side] ? `<span class="sy">${t('Sinergia')} +${nf(o.syn[side].toFixed(1))}</span>` : '', up = o.up && o.up[side] ? `<span class="sy up">${t('Esse lote liga com seu time')}</span>` : '';
+  return `<div class="fld"><div class="fh"><span>${t(side === 'off' ? 'ATAQUE' : 'DEFESA')} ${sy}</span>${up}<span class="num">${got}/8</span></div><div class="fg">${cells.join('')}<i class="los" style="grid-row:${side === 'off' ? 2 : 3}"></i></div></div>`;
+}
+// linhas de sinergia estilo FIFA: ligam os titulares do mesmo time da NFL, na cor do time
+function drawLinks(links) {
+  const run = () => ['off', 'def'].forEach((sd, k) => {
+    const fg = $('#fm').querySelectorAll('.fg')[k]; if (!fg || !links[sd].length) return;
+    const R0 = fg.getBoundingClientRect(), pt = id => { const c = fg.querySelector(`.tk[data-id="${id}"] .c`); if (!c) return null; const b = c.getBoundingClientRect(); return [b.left + b.width / 2 - R0.left, b.top + b.height / 2 - R0.top]; };
+    let svg = '';
+    for (const l of links[sd]) { const a = pt(l.a.id), b = pt(l.b.id); if (!a || !b) continue; const col = EMB[frIdx(l.a)][1];
+      svg += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#04121a" stroke-width="6" stroke-linecap="round" opacity=".55"/><line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${col}" stroke-width="3" stroke-linecap="round"/>`; }
+    fg.insertAdjacentHTML('afterbegin', `<svg class="lk" width="${R0.width}" height="${R0.height}">${svg}</svg>`);
+  });
+  requestAnimationFrame(run);
 }
 function paintLineup() {
   const A = G.A, M = me(), rows = lineupRows(M.roster);
@@ -574,12 +588,20 @@ function paintLineup() {
   if (flash != null) G.flashedV = A.version;
   const o = { cur: A.phase === 'bidding' ? A.cur : null, newId: flash };
   const off = rows.filter(r => OFF_POS.includes(r.pos)), def = rows.filter(r => !OFF_POS.includes(r.pos));
+  const L = lineup(M.roster), links = { off: synLinks(L, 'off'), def: synLinks(L, 'def') };
+  o.linked = new Set(); ['off', 'def'].forEach(sd => links[sd].forEach(l => { o.linked.add(l.a.id); o.linked.add(l.b.id); }));
+  o.syn = { off: synPts(links.off), def: synPts(links.def) };
+  if (o.cur && M.roster.length < TOTAL_SLOTS) {      // o lote em disputa ligaria com alguém do seu time?
+    const L2 = lineup(M.roster.concat([o.cur])), sd = OFF_POS.includes(o.cur.pos) ? 'off' : 'def', n2 = synLinks(L2, sd);
+    if (n2.some(l => l.a.id === o.cur.id || l.b.id === o.cur.id)) o.up = { [sd]: true };
+  }
   $('#fm').innerHTML = fieldHTML('off', off, o) + fieldHTML('def', def, o);
+  drawLinks(links);
   $('#lst').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE')}</div>${off.map(r => slotHTML(r, o)).join('')}<div class="sub">${t('DEFESA')}</div>${def.map(r => slotHTML(r, o)).join('')}`;
 }
 function openPosInfo() {
   const row = s => ([p, n, q, d]) => `<div class="pi"><span class="pos ${s}">${p}</span><div><b>${n}<em>${tpl('{n} vaga', '{n} vagas', q)} · ${nf(WEIGHT[p].toFixed(2).replace(/0$/, ''))}x</em></b><p>${t(d)}</p></div></div>`;
-  $('#posinfo-b').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE · tem a bola')}</div>${POSINFO.off.map(row('off')).join('')}<div class="sub">${t('DEFESA · tenta tomar a bola')}</div>${POSINFO.def.map(row('def')).join('')}<p class="sh-n">${t('O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR, LB e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.')}</p>`;
+  $('#posinfo-b').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE · tem a bola')}</div>${POSINFO.off.map(row('off')).join('')}<div class="sub">${t('DEFESA · tenta tomar a bola')}</div>${POSINFO.def.map(row('def')).join('')}<p class="sh-n">${t('O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR, LB e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.')}</p><p class="sh-n">${t('Sinergia: dois titulares do mesmo lado e do mesmo time da NFL ganham uma linha na cor do time e somam pontos no OVR (QB + WR = +1,0; RB + QB ≈ +0,9; linha com linha = +0,5), até +4 por lado.')}</p>`;
   $('#posinfo').hidden = false; $('#posinfo-b').scrollTop = 0;
 }
 $('#pos-info').onclick = openPosInfo;

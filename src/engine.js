@@ -43,11 +43,27 @@ function lineup(roster) {
 }
 // Peso de cada posição no OVR do time. A base é 1,0x; a média é sempre dividida pela soma dos pesos, então a escala do OVR não muda.
 const WEIGHT = { QB: 2.5, RB: 1.0, WR: 1.5, TE: 1.0, OL: 1.0, EDGE: 2.0, DT: 1.0, LB: 1.5, CB: 1.5 };   // base 1,0x; degraus 1,5x e 2,0x; o QB vale 2,5x
-// OVR do ataque / da defesa = média PONDERADA dos 8 titulares do lado.
+// Titulares de cada lado, com o peso da posição.
+function sideStarters(L, side) {
+  const o = [['QB', L.QB], ['RB', L.RB], ['WR', L.WR[0]], ['WR', L.WR[1]], ['TE', L.TE], ['OL', L.OL[0]], ['OL', L.OL[1]], ['OL', L.OL[2]]];
+  const d = [['EDGE', L.EDGE[0]], ['EDGE', L.EDGE[1]], ['DT', L.DT[0]], ['DT', L.DT[1]], ['LB', L.LB[0]], ['LB', L.LB[1]], ['CB', L.CB[0]], ['CB', L.CB[1]]];
+  return (side === 'off' ? o : d).map(([pos, p]) => ({ pos, p, w: WEIGHT[pos] }));
+}
+// SINERGIA: dois titulares do MESMO lado (ataque com ataque, defesa com defesa) do mesmo time da NFL formam um link.
+// Cada link soma SYN pontos de OVR por peso das duas posições (QB+WR = 1,0 pt; RB+QB ≈ 0,9; OL+OL = 0,5), com teto por lado.
+const SYN = 0.25, SYN_CAP = 4;
+function synLinks(L, side) {
+  const xs = sideStarters(L, side).filter(x => x.p && x.p.tm), out = [];
+  for (let i = 0; i < xs.length; i++) for (let j = i + 1; j < xs.length; j++)
+    if (xs[i].p.tm === xs[j].p.tm) out.push({ a: xs[i].p, b: xs[j].p, pa: xs[i].pos, pb: xs[j].pos, tm: xs[i].p.tm, pts: SYN * (xs[i].w + xs[j].w) });
+  return out;
+}
+const synPts = links => Math.min(SYN_CAP, links.reduce((n, l) => n + l.pts, 0));
+// OVR do ataque / da defesa = média PONDERADA dos 8 titulares do lado + bônus de sinergia.
 function ratings(L) {
-  const wavg = pairs => pairs.reduce((n, [p, w]) => n + p.ovr * w, 0) / pairs.reduce((n, [, w]) => n + w, 0);
-  const off = wavg([[L.QB, WEIGHT.QB], [L.RB, WEIGHT.RB], [L.WR[0], WEIGHT.WR], [L.WR[1], WEIGHT.WR], [L.TE, WEIGHT.TE], [L.OL[0], WEIGHT.OL], [L.OL[1], WEIGHT.OL], [L.OL[2], WEIGHT.OL]]);
-  const def = wavg([[L.EDGE[0], WEIGHT.EDGE], [L.EDGE[1], WEIGHT.EDGE], [L.DT[0], WEIGHT.DT], [L.DT[1], WEIGHT.DT], [L.LB[0], WEIGHT.LB], [L.LB[1], WEIGHT.LB], [L.CB[0], WEIGHT.CB], [L.CB[1], WEIGHT.CB]]);
+  const wavg = side => { const xs = sideStarters(L, side); return xs.reduce((n, x) => n + x.p.ovr * x.w, 0) / xs.reduce((n, x) => n + x.w, 0); };
+  const off = wavg('off') + synPts(synLinks(L, 'off'));
+  const def = wavg('def') + synPts(synLinks(L, 'def'));
   return { off, def, all: (off + def) / 2 };
 }
 
@@ -158,7 +174,8 @@ class Auction {
     // sobrou jogador na posição? bot sem pressa deixa os fracos passarem (até 2 vezes)
     if (this.supply(p.pos) > this.demand(p.pos) && p.passes < 2 && z < -.3 && R() < clamp((-z - .2) * .7, 0, .9)) return 0;
     const urg = 1 + .6 * (1 - slotsLeft(t) / TOTAL_SLOTS);
-    let w = (t.budget / slotsLeft(t)) * q * POSW[p.pos] * t.persona.aggr * t.persona.pos[p.pos] * urg * (.85 + R() * .3);
+    const syn = 1 + .07 * Math.min(3, t.roster.filter(x => x.tm && x.tm === p.tm && (OFF_POS.includes(x.pos) === OFF_POS.includes(p.pos))).length);   // bot paga um pouco mais por quem liga com o elenco
+    let w = (t.budget / slotsLeft(t)) * q * POSW[p.pos] * t.persona.aggr * t.persona.pos[p.pos] * urg * syn * (.85 + R() * .3);
     if (slotsLeft(t) === 1) w = Math.max(w, t.budget * .7);
     return clamp(Math.round(w), 1, maxBid(t, p));
   }
