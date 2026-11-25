@@ -42,7 +42,7 @@ function lineup(roster) {
            EDGE: by('EDGE'), DT: by('DT'), LB: by('LB'), CB: by('CB') };
 }
 // Peso de cada posição no OVR do time. A base é 1,0x; a média é sempre dividida pela soma dos pesos, então a escala do OVR não muda.
-const WEIGHT = { QB: 2.5, RB: 1.0, WR: 1.5, TE: 1.0, OL: 1.0, EDGE: 2.0, DT: 1.0, LB: 1.0, CB: 1.5 };   // base 1,0x; degraus 1,5x e 2,0x; o QB vale 2,5x
+const WEIGHT = { QB: 2.5, RB: 1.0, WR: 1.5, TE: 1.0, OL: 1.0, EDGE: 2.0, DT: 1.0, LB: 1.5, CB: 1.5 };   // base 1,0x; degraus 1,5x e 2,0x; o QB vale 2,5x
 // OVR do ataque / da defesa = média PONDERADA dos 8 titulares do lado.
 function ratings(L) {
   const wavg = pairs => pairs.reduce((n, [p, w]) => n + p.ovr * w, 0) / pairs.reduce((n, [, w]) => n + w, 0);

@@ -2,7 +2,9 @@
 import WebSocket from 'ws';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const S = require('../game/sim.js'); const { DB } = require('../game/db.js');
+import fs from 'fs';
+const load = f => { const m = { exports: {} }; new Function('module', 'exports', 'require', fs.readFileSync(new URL('../game/' + f, import.meta.url), 'utf8'))(m, m.exports, p => load(p.replace('./', ''))); return m.exports; };   // package type=module: carrega os arquivos como CommonJS
+const S = load('sim.js'); const { DB } = load('db.js');
 
 const BASE = process.env.BASE || 'localhost:8787';
 const code = Array.from({ length: 4 }, () => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 31)]).join('');
@@ -10,7 +12,7 @@ let fails = 0; const ok = (n, c) => { if (!c) { fails++; console.log('FALHOU:', 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 function client(name, tok, create, opts = {}) {
-  const c = { name, tok, msgs: [], lobby: null, start: null, snap: null, end: null, teams: null, pool: null, errs: [], bids: 0, seasons: [] };
+  const c = { name, tok, msgs: [], lobby: null, start: null, snap: null, end: null, teams: null, pool: null, errs: [], bids: 0, seasons: [], rounds: [] };
   const open = () => new Promise(res => {
     c.ws = new WebSocket(`ws://${BASE}/ws/${code}`);
     c.ws.on('open', () => { c.ws.send(JSON.stringify({ t: 'join', tok, name: '', auto: true, emb: opts.emb, create, pub: true })); res(); });
@@ -22,6 +24,7 @@ function client(name, tok, create, opts = {}) {
       if (m.t === 's') { c.snap = m; if (m.teams) c.teams = m.teams; if (opts.play) c.act(m); }
       if (m.t === 'end') c.end = m;
       if (m.t === 'season') c.seasons.push(m.seed);
+      if (m.t === 'round') c.rounds.push(m.n);
     });
   });
   c.connect = open; c.send = o => c.ws.send(JSON.stringify(o));
@@ -53,6 +56,10 @@ for (let i = 0; i < 2; i++) a.send({ t: 'addBot' }); await sleep(300);
 ok('5 assentos', a.lobby.seats.length === 5);
 const bot = a.lobby.seats.find(s => s.kind === 'bot'); a.send({ t: 'rm', uid: bot.uid }); await sleep(200);
 ok('bot removido', a.lobby.seats.length === 4);
+a.send({ t: 'start' }); await sleep(400); ok('sem todos prontos o anfitrião não inicia', !a.start);
+ok('lobby mostra ready=false para B', a.lobby.seats.find(x => x.kind === 'human' && !x.host && !x.ready));
+b.send({ t: 'ready', on: true }); await sleep(200); a.send({ t: 'start' }); await sleep(300); ok('com só um pronto ainda não inicia', !a.start);
+c.send({ t: 'ready', on: true }); await sleep(200); c.send({ t: 'ready', on: false }); await sleep(200); c.send({ t: 'ready', on: true }); await sleep(200);
 a.send({ t: 'start' }); await sleep(500);
 ok('todos receberam start', a.start && b.start && c.start);
 ok('ids diferentes', new Set([a.start.you, b.start.you, c.start.you]).size === 3);
@@ -81,5 +88,9 @@ ok('temporada idêntica em A e B', run(a) === run(b)); ok('temporada idêntica e
 a.send({ t: 'reseason' }); await sleep(300);
 ok('reseason só do anfitrião chega pra todos', b.seasons.length === 1 && c.seasons.length === 1 && b.seasons[0] !== a.end.seed);
 b.send({ t: 'reseason' }); await sleep(200); ok('reseason de não-anfitrião ignorado', b.seasons.length === 1);
+a.send({ t: 'round', n: 1 }); await sleep(200); ok('round fora de ordem ignorado', !b.rounds.length);
+a.send({ t: 'round', n: 0 }); await sleep(300); ok('round 0 chega pra todos', b.rounds.join() === '0' && c.rounds.join() === '0' && a.rounds.join() === '0');
+b.send({ t: 'round', n: 1 }); await sleep(200); ok('round de não-anfitrião ignorado', b.rounds.length === 1);
+a.send({ t: 'round', n: 1 }); await sleep(200); ok('round 1 em seguida', b.rounds.join() === '0,1');
 [a, b, c].forEach(x => x.ws.close());
 console.log(fails ? 'FALHAS: ' + fails : 'TUDO OK'); process.exit(fails ? 1 : 0);

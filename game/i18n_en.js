@@ -214,7 +214,7 @@ I18N.en = {
 "Cobrem os receptores. Tentam derrubar ou interceptar o passe e não deixam o WR escapar.": "Cover the receivers. Try to knock down or intercept the pass and keep the WR from getting away.",
 "ATAQUE · tem a bola": "OFFENSE · has the ball",
 "DEFESA · tenta tomar a bola": "DEFENSE · tries to take the ball",
-"O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.": "Offense OVR is the weighted average of the 8 offensive starters, and defense OVR is the weighted average of the 8 defensive ones. The base is 1.0x. WR and CB go up to 1.5x. EDGE counts 2.0x and the QB counts 2.5x. In other words, a 90 QB weighs two and a half times a 90 lineman.",
+"O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR, LB e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.": "Offense OVR is the weighted average of the 8 offensive starters, and defense OVR is the weighted average of the 8 defensive ones. The base is 1.0x. WR, LB and CB go up to 1.5x. EDGE counts 2.0x and the QB counts 2.5x. In other words, a 90 QB weighs two and a half times a 90 lineman.",
 "{n} vaga": "{n} slot",
 "{n} vagas": "{n} slots",
 "{team} por {p}": "{team} for {p}",
@@ -342,4 +342,19 @@ Object.assign(I18N.en, {
   '{n}/16 titulares · sobram {b}': '{n}/16 starters · {b} left',
   'Sair do leilão? Um bot joga no seu lugar e você pode voltar pelo código da sala.': 'Leave the auction? A bot plays in your place and you can come back with the room code.',
   'Sair do leilão? O progresso desse leilão se perde.': 'Leave the auction? Progress in this auction will be lost.'
+});
+Object.assign(I18N.en, {
+  'Salas abertas': 'Open rooms', 'Senha da sala (opcional)': 'Room password (optional)',
+  'Essa sala tem senha. Digite a senha e toque em Entrar.': 'This room has a password. Enter it and tap Join.', 'Senha incorreta.': 'Wrong password.',
+  'Sala com senha: passe o código e a senha. O link sozinho não entra.': "Password room: share the code and the password. The link alone won't get in."
+});
+Object.assign(I18N.en, {
+  'Você · pronto': 'You · ready', 'Pronto': 'Ready', 'Estou pronto': "I'm ready", 'Cancelar pronto': 'Cancel ready',
+  'Aguardando {n} jogador ficar pronto': 'Waiting for {n} player to get ready', 'Aguardando {n} jogadores ficarem prontos': 'Waiting for {n} players to get ready',
+  'Os outros jogadores marcam "Estou pronto" pra você abrir o leilão.': 'The other players tap "I\'m ready" so you can open the auction.',
+  'Pronto! O anfitrião abre o leilão quando todos estiverem prontos.': 'Ready! The host opens the auction when everyone is ready.',
+  'Marque pronto quando quiser começar. O anfitrião abre o leilão.': 'Tap ready when you want to start. The host opens the auction.',
+  'Aguardando o anfitrião iniciar a rodada. Todos começam juntos.': 'Waiting for the host to start the round. Everyone starts together.',
+  'O anfitrião inicia a temporada e as rodadas. Todos começam juntos.': 'The host starts the season and the rounds. Everyone starts together.',
+  'Voltar ao menu': 'Back to menu', 'Som ligado': 'Sound on', 'Som desligado': 'Sound off'
 });

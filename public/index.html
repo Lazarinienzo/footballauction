@@ -605,6 +605,8 @@ html,body{overflow-x:hidden}
 #net{position:fixed;left:0;right:0;top:0;z-index:99;padding:9px 14px;background:var(--flag);color:var(--flag-ink);font-weight:800;font-size:13px;text-align:center}
 #net[hidden]{display:none}
 .bar .back{width:38px;height:38px;font-size:18px;flex:none}
+#a-snd .x{display:none}#a-snd.off .w{display:none}#a-snd.off .x{display:inline}#a-snd.off{opacity:.6}
+.seat.rdy{border-color:rgba(80,220,140,.6)}.seat.rdy .sn small{color:#5fe3a0}
 .bar .bsold{margin-right:auto}
 .trow[data-t]{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .trow[data-t]:active{background:var(--panel)}
@@ -618,6 +620,15 @@ html,body{overflow-x:hidden}
 .tvh small{color:var(--mute);font-size:13px}
 #tv-b .lu{display:block}
 @media (min-width:900px){#tv-b .lu{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}}
+.shcol{display:flex;flex-direction:column;gap:6px;min-width:0}
+.pwin{width:100%;background:var(--panel);border:1px solid var(--line);color:#fff;border-radius:999px;padding:14px 18px;font:inherit;font-size:15px}
+.pwin::placeholder{color:var(--mute)}
+.rlist{padding:10px;display:flex;flex-direction:column;gap:8px}
+.rlist .seat{padding:10px 12px}
+.rlist .empty{padding:10px 6px;color:var(--mute);font-size:14px;text-align:center}
+.rlist .go{border:0;border-radius:999px;padding:10px 16px;background:var(--flag);color:var(--flag-ink);font:inherit;font-weight:800;font-size:14px}
+.rlist .lk{display:inline-block;vertical-align:-2px;margin-left:6px;color:var(--flag)}
+#home-rooms .yard{margin-top:22px}
 </style>
 </head>
 <body>
@@ -637,6 +648,7 @@ html,body{overflow-x:hidden}
     <p class="lead" id="lead-on" hidden>Crie uma sala ou entre na de um amigo, escolha seu escudo e dispute o leilão ao vivo.</p>
   </div>
 
+  <div class="shcol">
   <div class="card form">
     <button class="btn full" id="go-online" hidden>Jogar online</button>
     <button class="btn full" id="go-lobby">Criar sala</button>
@@ -645,6 +657,11 @@ html,body{overflow-x:hidden}
     <button class="btn ghost full" id="go-cup">Simular um campeonato (8 bots)</button>
     <button class="btn ghost full" id="go-lab">Laboratório da simulação</button>
     <p class="note" id="note-off">Entrar com código chega com o modo online. Por enquanto a sala é sua e as vagas vazias viram bots.</p>
+  </div>
+  <div id="home-rooms" hidden>
+    <div class="yard">Salas abertas <button class="mini" id="home-refresh" type="button">Atualizar</button></div>
+    <div class="card rlist" id="home-list"></div>
+  </div>
   </div>
 
   </div>
@@ -736,11 +753,12 @@ html,body{overflow-x:hidden}
     <button class="btn full" id="on-priv">Criar sala privada</button>
     <button class="btn ghost full" id="on-pub">Criar sala pública</button>
     <p class="note">Na privada só entra quem tem o código. A pública aparece na lista pra qualquer pessoa entrar.</p>
+    <input class="pwin" id="on-pw" type="password" maxlength="24" autocomplete="off" placeholder="Senha da sala (opcional)" aria-label="Senha da sala (opcional)">
     <div class="join"><input id="on-code" maxlength="4" placeholder="Código" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Código da sala"><button class="btn ghost" id="on-join">Entrar</button></div>
     <p class="note on-msg" id="on-msg" role="status"></p>
   </div>
   <div class="yard">Salas públicas <button class="mini" id="on-refresh">Atualizar</button></div>
-  <div class="card" id="on-list"></div>
+  <div class="card rlist" id="on-list"></div>
   </div>
 </section>
 
@@ -800,6 +818,7 @@ html,body{overflow-x:hidden}
   <div class="bar">
     <button class="back" id="a-back" type="button" aria-label="Voltar para o início">←</button>
     <div class="bsold"><span class="k">VENDIDOS</span><div class="prog num" id="a-prog">0/52</div></div>
+    <button class="back" id="a-snd" type="button" aria-label="Som"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z" fill="currentColor"/><path class="w" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M17 9l5 6M22 9l-5 6"/></svg></button>
     <div class="wallet"><b class="num" id="a-bud">$200</b><span id="a-slots">16 vagas</span></div>
   </div>
   <div class="a-main">
@@ -855,8 +874,9 @@ html,body{overflow-x:hidden}
   </div>
   </div>
   <div class="actions"><button class="btn ghost full" id="r-card">Cartão do meu time</button><button class="btn full" id="sim">Simular temporada</button></div>
+  <p class="note" id="sim-wait" hidden style="text-align:center;margin-top:12px">O anfitrião inicia a temporada e as rodadas. Todos começam juntos.</p>
   <div id="season" hidden></div>
-  <div class="actions"><button class="btn ghost full" id="again">Novo leilão</button></div>
+  <div class="actions"><button class="btn ghost full" id="again">Novo leilão</button><button class="btn ghost full" id="r-home">Voltar ao menu</button></div>
 </section>
 
 </div>
@@ -913,7 +933,7 @@ function lineup(roster) {
            EDGE: by('EDGE'), DT: by('DT'), LB: by('LB'), CB: by('CB') };
 }
 // Peso de cada posição no OVR do time. A base é 1,0x; a média é sempre dividida pela soma dos pesos, então a escala do OVR não muda.
-const WEIGHT = { QB: 2.5, RB: 1.0, WR: 1.5, TE: 1.0, OL: 1.0, EDGE: 2.0, DT: 1.0, LB: 1.0, CB: 1.5 };   // base 1,0x; degraus 1,5x e 2,0x; o QB vale 2,5x
+const WEIGHT = { QB: 2.5, RB: 1.0, WR: 1.5, TE: 1.0, OL: 1.0, EDGE: 2.0, DT: 1.0, LB: 1.5, CB: 1.5 };   // base 1,0x; degraus 1,5x e 2,0x; o QB vale 2,5x
 // OVR do ataque / da defesa = média PONDERADA dos 8 titulares do lado.
 function ratings(L) {
   const wavg = pairs => pairs.reduce((n, [p, w]) => n + p.ovr * w, 0) / pairs.reduce((n, [, w]) => n + w, 0);
@@ -1518,7 +1538,7 @@ I18N.en = {
 "Cobrem os receptores. Tentam derrubar ou interceptar o passe e não deixam o WR escapar.": "Cover the receivers. Try to knock down or intercept the pass and keep the WR from getting away.",
 "ATAQUE · tem a bola": "OFFENSE · has the ball",
 "DEFESA · tenta tomar a bola": "DEFENSE · tries to take the ball",
-"O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.": "Offense OVR is the weighted average of the 8 offensive starters, and defense OVR is the weighted average of the 8 defensive ones. The base is 1.0x. WR and CB go up to 1.5x. EDGE counts 2.0x and the QB counts 2.5x. In other words, a 90 QB weighs two and a half times a 90 lineman.",
+"O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR, LB e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.": "Offense OVR is the weighted average of the 8 offensive starters, and defense OVR is the weighted average of the 8 defensive ones. The base is 1.0x. WR, LB and CB go up to 1.5x. EDGE counts 2.0x and the QB counts 2.5x. In other words, a 90 QB weighs two and a half times a 90 lineman.",
 "{n} vaga": "{n} slot",
 "{n} vagas": "{n} slots",
 "{team} por {p}": "{team} for {p}",
@@ -1647,6 +1667,21 @@ Object.assign(I18N.en, {
   'Sair do leilão? Um bot joga no seu lugar e você pode voltar pelo código da sala.': 'Leave the auction? A bot plays in your place and you can come back with the room code.',
   'Sair do leilão? O progresso desse leilão se perde.': 'Leave the auction? Progress in this auction will be lost.'
 });
+Object.assign(I18N.en, {
+  'Salas abertas': 'Open rooms', 'Senha da sala (opcional)': 'Room password (optional)',
+  'Essa sala tem senha. Digite a senha e toque em Entrar.': 'This room has a password. Enter it and tap Join.', 'Senha incorreta.': 'Wrong password.',
+  'Sala com senha: passe o código e a senha. O link sozinho não entra.': "Password room: share the code and the password. The link alone won't get in."
+});
+Object.assign(I18N.en, {
+  'Você · pronto': 'You · ready', 'Pronto': 'Ready', 'Estou pronto': "I'm ready", 'Cancelar pronto': 'Cancel ready',
+  'Aguardando {n} jogador ficar pronto': 'Waiting for {n} player to get ready', 'Aguardando {n} jogadores ficarem prontos': 'Waiting for {n} players to get ready',
+  'Os outros jogadores marcam "Estou pronto" pra você abrir o leilão.': 'The other players tap "I\'m ready" so you can open the auction.',
+  'Pronto! O anfitrião abre o leilão quando todos estiverem prontos.': 'Ready! The host opens the auction when everyone is ready.',
+  'Marque pronto quando quiser começar. O anfitrião abre o leilão.': 'Tap ready when you want to start. The host opens the auction.',
+  'Aguardando o anfitrião iniciar a rodada. Todos começam juntos.': 'Waiting for the host to start the round. Everyone starts together.',
+  'O anfitrião inicia a temporada e as rodadas. Todos começam juntos.': 'The host starts the season and the rounds. Everyone starts together.',
+  'Voltar ao menu': 'Back to menu', 'Som ligado': 'Sound on', 'Som desligado': 'Sound off'
+});
 const MP_ON = true;      // o build online troca por true (precisa do servidor Cloudflare)
 // ---------- interface ----------
 const $ = s => document.querySelector(s);
@@ -1739,7 +1774,7 @@ function tween(el, to, fmt, from) {
   };
   el._r = requestAnimationFrame(step);
 }
-function show(id) { if (id !== 'results' && id !== 'cup') svStop(); if (id === 'setup' && G.mp) mpLeave(); for (const s of ['setup', 'lab', 'cup', 'online', 'lobby', 'auction', 'results']) $('#' + s).hidden = s !== id; window.scrollTo(0, 0); }
+function show(id) { if (id !== 'results' && id !== 'cup') svStop(); if (id === 'setup' && G.mp) mpLeave(); if (id === 'setup' && MP_ON && typeof homeRefresh === 'function') homeRefresh(); for (const s of ['setup', 'lab', 'cup', 'online', 'lobby', 'auction', 'results']) $('#' + s).hidden = s !== id; window.scrollTo(0, 0); }
 
 
 // ----- banco de narração (sem números; {q}=QB {r}=RB {w}=WR {e}=TE {t}=tackle {g}=guard {c}=center | defesa: {ed}{dt}{lb}{cb} | {O}=ataque {D}=defesa {oc}=cidade do ataque) -----
@@ -1956,6 +1991,7 @@ function paintLobby() {
   if (L.mp) mpPaintGo(n);
 }
 $('#go-lobby').onclick = $('#go-solo').onclick = () => { L.mp = false; openLobby(!L.log.length || L.wasMp); L.wasMp = false; };
+$('#r-home').onclick = () => { svStop(); SV.el = null; show('setup'); };
 $('#lb-back').onclick = () => show('setup');
 $('#lb-name').oninput = e => {
   L.name = e.target.value.slice(0, 44); L.auto = L.name === emN(L.emb); if (L.mp) mpName();
@@ -1977,7 +2013,7 @@ $('#lb-seats').onclick = e => {
   if (x) { const b = L.bots.find(q => q.uid === +x.dataset.rm); L.bots = L.bots.filter(q => q !== b); L.seen.delete('b' + b.uid); logL('Saiu da sala: {n}', { n: b.name }); paintLobby(); }
 };
 $('#lb-go').onclick = () => {
-  if (L.mp) { mpSend({ t: 'start' }); return; }
+  if (L.mp) { if (mpIsHost()) mpSend({ t: 'start' }); else { const m = MP.lobby, me0 = m.seats.find(x => x.uid === m.you); mpSend({ t: 'ready', on: !(me0 && me0.ready) }); } return; }
   G.mp = false; G.meId = 0; G.A = null;
   const flat = {}; POS_ORDER.forEach(p => flat[p] = 1);
   G.name = (L.name.trim() || emN(L.emb)).slice(0, 44);
@@ -1992,6 +2028,25 @@ $('#lb-go').onclick = () => {
   show('auction'); paintAuction(true, 16);
   cancelAnimationFrame(G.raf); G.last = performance.now(); G.raf = requestAnimationFrame(frame);
 };
+
+// ----- sons (WebAudio, sem arquivos): "up" curtinho a cada lance -----
+const sfx = {
+  on: (() => { try { return localStorage.getItem('fa-snd') !== '0'; } catch (e) { return true; } })(), ctx: null,
+  unlock() { if (!sfx.ctx) { try { sfx.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; } } if (sfx.ctx.state === 'suspended') sfx.ctx.resume(); },
+  up(mine) {
+    if (!sfx.on || !sfx.ctx || sfx.ctx.state !== 'running') return;
+    const nw = performance.now(); if (nw - (sfx.last || 0) < 110) return; sfx.last = nw;
+    const c = sfx.ctx, t0 = c.currentTime, f = mine ? [620, 930] : [440, 560], v = mine ? .16 : .07;
+    const o = c.createOscillator(), g = c.createGain(); o.type = 'triangle';
+    o.frequency.setValueAtTime(f[0], t0); o.frequency.setValueAtTime(f[1], t0 + .07);
+    g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(v, t0 + .015); g.gain.exponentialRampToValueAtTime(.001, t0 + .22);
+    o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + .24);
+  },
+  paint() { const b = $('#a-snd'); if (b) { b.classList.toggle('off', !sfx.on); b.setAttribute('aria-pressed', String(sfx.on)); b.setAttribute('aria-label', t(sfx.on ? 'Som ligado' : 'Som desligado')); } }
+};
+document.addEventListener('pointerdown', sfx.unlock); document.addEventListener('keydown', sfx.unlock);
+$('#a-snd').onclick = () => { sfx.on = !sfx.on; try { localStorage.setItem('fa-snd', sfx.on ? '1' : '0'); } catch (e) { } sfx.paint(); if (sfx.on) sfx.up(true); };
+sfx.paint();
 
 // ----- leilão -----
 const me = () => G.teams[G.meId || 0];
@@ -2052,6 +2107,7 @@ function paintAuction(force, dt) {
   const fk = A.i + ':' + A.nBids;
   if (G.feedKey !== fk || force) {
     G.feedKey = fk;
+    { const lb = A.bids[A.bids.length - 1]; if (!force && lb && lb.kind !== 'pass' && G.feedI === A.i) sfx.up(lb.team === M); G.feedI = A.i; }
     const nm = tm => tm === M ? t('Você') : tm.name, last = A.bids.slice(-3).reverse();
     $('#s-feed').innerHTML = last.length ? last.map((b, i) => b.kind === 'pass'
       ? `<div class="bl out ${b.team === M ? 'me' : ''} ${i === 0 ? 'new' : ''}"><span class="w">${esc(nm(b.team))}</span><span class="d">${t('saiu do lance')}</span><b></b></div>`
@@ -2165,7 +2221,7 @@ function paintLineup() {
 }
 function openPosInfo() {
   const row = s => ([p, n, q, d]) => `<div class="pi"><span class="pos ${s}">${p}</span><div><b>${n}<em>${tpl('{n} vaga', '{n} vagas', q)} · ${nf(WEIGHT[p].toFixed(2).replace(/0$/, ''))}x</em></b><p>${t(d)}</p></div></div>`;
-  $('#posinfo-b').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE · tem a bola')}</div>${POSINFO.off.map(row('off')).join('')}<div class="sub">${t('DEFESA · tenta tomar a bola')}</div>${POSINFO.def.map(row('def')).join('')}<p class="sh-n">${t('O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.')}</p>`;
+  $('#posinfo-b').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE · tem a bola')}</div>${POSINFO.off.map(row('off')).join('')}<div class="sub">${t('DEFESA · tenta tomar a bola')}</div>${POSINFO.def.map(row('def')).join('')}<p class="sh-n">${t('O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR, LB e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.')}</p>`;
   $('#posinfo').hidden = false; $('#posinfo-b').scrollTop = 0;
 }
 $('#pos-info').onclick = openPosInfo;
@@ -2257,7 +2313,8 @@ function paintResults() {
   $('#r-teams').innerHTML = `<tr><th>${t('TIME')}</th><th>${t('ATQ')}</th><th>${t('DEF')}</th><th>${t('GERAL')}</th><th>${t('SOBROU')}</th></tr>` +
     sorted.map((t, i) => `<tr class="rvf ${t.human ? 'me' : ''}" style="--i:${i + 8}"><td><span class="tn">${badge(t.emb, 22)}${esc(t.name)}</span></td><td class="num">${t.rt.off.toFixed(1)}</td><td class="num">${t.rt.def.toFixed(1)}</td><td class="num"><b>${t.rt.all.toFixed(1)}</b></td><td class="num">${dollars(t.budget)}</td></tr>`).join('');
   $('#sim').textContent = t($('#season').hidden ? 'Simular temporada' : 'Refazer temporada');
-  $('#sim').hidden = !!(G.mp && !MP.host && !$('#season').hidden);
+  $('#sim').hidden = !!(G.mp && !MP.host);
+  $('#sim-wait').hidden = !(G.mp && !MP.host && $('#season').hidden);
 }
 const tn = id => G.teams.find(t => t.id === id);
 // ----- temporada em rodadas ao vivo: todos os jogos da rodada acontecem ao mesmo tempo -----
@@ -2286,7 +2343,8 @@ function liveTimeline(g) {
 function svStartRound() {
   const r = SV.S.rounds[SV.done]; if (!r || LV.running) return;
   LV.games = {}; LV.now = 0; LV.endAt = 0; LV.nDone = 0; LV.running = true;
-  r.games.forEach(g => { const i = SV.S.games.indexOf(g); LV.games[i] = Object.assign({ g, i, n: 0, shown: 0, done: false, score: [0, 0] }, liveTimeline(g)); });
+  const mk = () => r.games.forEach(g => { const i = SV.S.games.indexOf(g); LV.games[i] = Object.assign({ g, i, n: 0, shown: 0, done: false, score: [0, 0] }, liveTimeline(g)); });
+  if (G.mp && !SV.cup) withSeed(MP.seed + 100 + SV.done, mk); else mk();
   svRender();
   const y = SV.el.querySelector('.yard'); if (y) y.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
   LV.last = performance.now(); LV.raf = requestAnimationFrame(svTick);
@@ -2323,7 +2381,7 @@ function svGameDone(L) {
 function svRoundDone() { LV.running = false; SV.done++; svRender(); }
 function svOpen(i) {
   const g = SV.S.games[i]; if (!g || g.round > SV.done) return;
-  if (g.round === SV.done && !LV.running) svStartRound();
+  if (g.round === SV.done && !LV.running) { if (G.mp && !SV.cup) return; svStartRound(); }
   openGame(i);
 }
 function svMatch(g) {
@@ -2361,11 +2419,12 @@ function svRender() {
   let head = '';
   if (fin) head = `<div class="champ pop"><div class="cb">${badge(champ.emb, 68)}<div><small>${t(champ.id === me ? 'VOCÊ GANHOU O SUPER BOWL' : 'CAMPEÃO DO SUPER BOWL')}</small><h2>${esc(champ.name)}</h2></div></div></div>${me >= 0 ? `<p class="note" style="margin-top:12px">${svSummary()}</p><div class="pact"><button class="btn ghost full" data-act="card">${t('Cartão da temporada')}</button></div>` : ''}${statsHTML(S)}`;
   else {
+    const wait = G.mp && !SV.cup && !MP.host;
     const n = cur.games.length, hasMine = me >= 0 && cur.games.some(g => g.a === me || g.b === me);
     head = `<div class="card prog"><small>${t(cur.kind === 'reg' ? 'TEMPORADA REGULAR' : 'MATA-MATA')}</small><h3>${esc(rl(cur.label))}</h3>
       <div class="pbar"><i style="width:${(100 * d / R.length).toFixed(1)}%"></i></div>
       <p class="note">${LV.running ? t('Ao vivo · {b} jogos terminados. Todos rolam ao mesmo tempo.', { b: `<b id="sv-fin" style="color:var(--flag)">${t('{a} de {b}', { a: LV.nDone, b: n })}</b>` }) : `${d === 0 ? t('Sorteio feito: {n} rodadas + mata-mata. ', { n: regTotal }) : ''}${tpl('{n} jogo ao mesmo tempo, em tempo real.', '{n} jogos ao mesmo tempo, em tempo real.', n)}`}</p>
-      <div class="pact">${LV.running ? '' : `<button class="btn full" data-act="start">${t('Iniciar rodada')}</button>`}${hasMine ? `<button class="btn ${LV.running ? '' : 'ghost'} full" data-act="mine">${t(LV.running ? 'Assistir meu jogo' : 'Iniciar e assistir meu jogo')}</button>` : ''}<button class="btn ghost full" data-act="speed">${t('Velocidade {n}×', { n: SV.speed })}</button></div></div>`;
+      <div class="pact">${LV.running ? '' : wait ? `<p class="note" style="margin:0">${t('Aguardando o anfitrião iniciar a rodada. Todos começam juntos.')}</p>` : `<button class="btn full" data-act="start">${t('Iniciar rodada')}</button>`}${hasMine && (LV.running || !wait) ? `<button class="btn ${LV.running ? '' : 'ghost'} full" data-act="mine">${t(LV.running ? 'Assistir meu jogo' : 'Iniciar e assistir meu jogo')}</button>` : ''}<button class="btn ghost full" data-act="speed">${t('Velocidade {n}×', { n: SV.speed })}</button></div></div>`;
   }
   const poRounds = R.filter(r => r.kind === 'po');
   SV.el.innerHTML = `<div class="svg"><div class="svc">${head}
@@ -2386,8 +2445,12 @@ document.addEventListener('click', e => {
   const act = e.target.closest('[data-act]');
   if (act) {
     const k = act.dataset.act;
-    if (k === 'start') svStartRound();
-    else if (k === 'mine') { const r = SV.S.rounds[SV.done], g = r && r.games.find(x => x.a === SV.meId || x.b === SV.meId); if (g) svOpen(SV.S.games.indexOf(g)); }
+    if (k === 'start') { if (G.mp && !SV.cup) { if (MP.host) mpSend({ t: 'round', n: SV.done }); } else svStartRound(); }
+    else if (k === 'mine') {
+      const r = SV.S.rounds[SV.done], g = r && r.games.find(x => x.a === SV.meId || x.b === SV.meId); if (!g) return;
+      if (G.mp && !SV.cup && !LV.running) { MP.watch = SV.S.games.indexOf(g); mpSend({ t: 'round', n: SV.done }); return; }
+      svOpen(SV.S.games.indexOf(g));
+    }
     else if (k === 'card') { const f = svFate(); openShare(f.M, { text: f.cardTxt, rec: f.rs, gold: f.champ === f.M }); }
     else if (k === 'speed') { SV.speed = SV.speed === 1 ? 2 : SV.speed === 2 ? 4 : 1; el.querySelectorAll('[data-act=speed]').forEach(b => b.textContent = t('Velocidade {n}×', { n: SV.speed })); }
     return;
@@ -2403,7 +2466,7 @@ document.addEventListener('click', e => {
 
 // jogo de verdade: depois do leilão, a temporada anda jogo a jogo
 $('#sim').onclick = () => {
-  if (G.mp && !$('#season').hidden) { if (MP.host) mpSend({ t: 'reseason' }); return; }
+  if (G.mp) { if (MP.host) mpSend({ t: 'reseason' }); return; }
   svStart($('#season'), me().id, false);
   $('#sim').textContent = t('Refazer temporada');
   $('#sim').hidden = !!(G.mp && !MP.host);
@@ -2704,10 +2767,10 @@ const seatName = s => s.auto || !s.name ? emN(s.emb) : s.name;
 const mpIsHost = () => !!(MP.lobby && MP.lobby.seats.some(s => s.uid === MP.lobby.you && s.host));
 const mpOthers = () => MP.lobby ? MP.lobby.seats.filter(s => s.uid !== MP.lobby.you).map(s => ({ emb: s.emb, name: seatName(s) })) : [];
 
-function mpConnect(code, create, pub) {
+function mpConnect(code, create, pub, pw) {
   if (MP.ws) { try { MP.ws.onclose = null; MP.ws.close(); } catch (e) { } }
   clearTimeout(MP.retryT);
-  Object.assign(MP, { code, create, pub, joined: false, left: false, tries: 0, lobby: null, host: false, seed: null, phase: 'lobby', prev: null });
+  Object.assign(MP, { code, create, pub, pw: pw || '', joined: false, left: false, tries: 0, lobby: null, host: false, seed: null, phase: 'lobby', prev: null });
   G.mp = true; L.mp = true; L.bots = []; L.log = []; L.seen = new Set();
   mpOpen();
   clearInterval(MP.pingT); MP.pingT = setInterval(() => mpSend({ t: 'ping' }), 20000);
@@ -2716,7 +2779,7 @@ function mpOpen() {
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/${MP.code}`); MP.ws = ws;
   ws.onopen = () => {
     netBanner(false);
-    ws.send(JSON.stringify({ t: 'join', tok: mpTok(), name: L.auto ? '' : L.name, auto: L.auto, emb: L.emb, create: MP.create && !MP.joined, pub: MP.pub }));
+    ws.send(JSON.stringify({ t: 'join', tok: mpTok(), name: L.auto ? '' : L.name, auto: L.auto, emb: L.emb, create: MP.create && !MP.joined, pub: MP.pub, pw: MP.pw }));
   };
   ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (x) { return; } mpMsg(m); };
   ws.onclose = () => {
@@ -2746,11 +2809,13 @@ function mpMsg(m) {
     case 'start': return mpStartMsg(m);
     case 's': return mpSnap(m);
     case 'end': return mpEnd(m);
-    case 'season': MP.seed = m.seed; if (G.mp && vis('results') && !$('#season').hidden) svStart($('#season'), me().id, false); return;
+    case 'season': MP.seed = m.seed; if (G.mp && vis('results')) { svStart($('#season'), me().id, false); $('#sim').textContent = t('Refazer temporada'); $('#sim').hidden = !MP.host; $('#sim-wait').hidden = true; $('#season').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' }); } return;
+    case 'round': if (G.mp && vis('results') && SV.S && SV.done === m.n && !LV.running) { svStartRound(); if (MP.watch != null) { svOpen(MP.watch); MP.watch = null; } } return;
     case 'closed': return mpFail(t('A sala foi encerrada.'));
     case 'err': {
       if (m.code === 'bug') return;
-      if (m.code === 'exists' && MP.create && !MP.joined && MP.newCode++ < 8) return mpConnect(mkCode(), true, MP.pub);
+      if (m.code === 'exists' && MP.create && !MP.joined && MP.newCode++ < 8) return mpConnect(mkCode(), true, MP.pub, MP.pw);
+      if (m.code === 'pass') { $('#on-code').value = MP.code; mpFail(t(m.wrong ? 'Senha incorreta.' : 'Essa sala tem senha. Digite a senha e toque em Entrar.')); setTimeout(() => $('#on-pw').focus(), 60); return; }
       const msg = { none: 'Sala não encontrada. Confira o código.', started: 'O leilão dessa sala já começou.', full: 'Essa sala está cheia.', kicked: 'O anfitrião tirou você da sala.', tok: 'Erro de identificação. Recarregue a página.' }[m.code] || 'Não deu pra entrar na sala.';
       return mpFail(t(msg));
     }
@@ -2781,25 +2846,31 @@ function lobbyMode() {
   const on = !!L.mp;
   $('#lb-tag-l').hidden = on; $('#lb-tag-o').hidden = !on;
   const l = $('#lb-tk-l'), o = $('#lb-tk-o'); o.hidden = !on; l.hidden = on && true;
+  if (on) o.textContent = t(MP.lobby && MP.lobby.lock ? 'Sala com senha: passe o código e a senha. O link sozinho não entra.' : 'Passe o código ou o link pros amigos entrarem na sala.');
   if (!on && MP_ON) l.textContent = t('Sala de treino: você e os bots.');
   $('#lb-copy').hidden = !on; $('#lb-copy').textContent = t(MP.copyT ? 'Copiado!' : 'Copiar link');
 }
 function mpPaintSeats(seat) {
   const m = MP.lobby, host = mpIsHost(), me0 = m.seats.find(s => s.uid === m.you), rest = m.seats.filter(s => s.uid !== m.you);
-  let h = seat('me', L.emb, L.name || t('Seu Time'), t(me0 && me0.host ? 'Você · anfitrião' : 'Você'), 'me');
+  let h = seat('me', L.emb, L.name || t('Seu Time'), t(me0 && me0.host ? 'Você · anfitrião' : me0 && me0.ready ? 'Você · pronto' : 'Você'), me0 && me0.ready && !me0.host ? 'me rdy' : 'me');
   h += rest.map(s => {
-    const nm = seatName(s), tag = s.kind === 'bot' ? t('Bot · pronto') : !s.on ? t('Reconectando…') : t(s.host ? 'Anfitrião' : 'Na sala');
+    const nm = seatName(s), tag = s.kind === 'bot' ? t('Bot · pronto') : !s.on ? t('Reconectando…') : t(s.host ? 'Anfitrião' : s.ready ? 'Pronto' : 'Na sala');
     const x = host ? `<button class="x" data-rm="${s.uid}" aria-label="${esc(t('Tirar {n}', { n: nm }))}">×</button>` : '';
-    return seat('u' + s.uid, s.emb, nm, tag, s.on ? '' : 'away', x);
+    return seat('u' + s.uid, s.emb, nm, tag, (s.on ? '' : 'away') + (s.kind === 'human' && s.ready && !s.host ? ' rdy' : ''), x);
   }).join('');
   if (host && m.seats.length < m.max) h += `<button class="seat dash" id="lb-add"><span class="plus">+</span><div class="sn"><b>${t('Adicionar bot')}</b><small>${t('Preenche a vaga')}</small></div></button>`;
   h += `<button class="seat dash" id="lb-invite"><span class="plus">＋</span><div class="sn"><b>${t('Convidar amigo')}</b><small>${t('Copiar o link da sala')}</small></div></button>`;
   $('#lb-seats').innerHTML = h;
 }
 function mpPaintGo(n) {
-  if (mpIsHost()) return;
-  $('#lb-go').textContent = t('Aguardando o anfitrião'); $('#lb-go').disabled = true;
-  $('#lb-note').textContent = t('O anfitrião decide quando abrir o leilão.');
+  const m = MP.lobby, mine = m.seats.find(x => x.uid === m.you), wait = m.seats.filter(x => !x.ready).length;
+  if (mpIsHost()) {
+    if (n >= MIN_TEAMS && wait) { $('#lb-go').textContent = tpl('Aguardando {n} jogador ficar pronto', 'Aguardando {n} jogadores ficarem prontos', wait); $('#lb-go').disabled = true; $('#lb-note').textContent = t('Os outros jogadores marcam "Estou pronto" pra você abrir o leilão.'); }
+    return;
+  }
+  const r = !!(mine && mine.ready);
+  $('#lb-go').textContent = t(r ? 'Cancelar pronto' : 'Estou pronto'); $('#lb-go').disabled = false;
+  $('#lb-note').textContent = t(r ? 'Pronto! O anfitrião abre o leilão quando todos estiverem prontos.' : 'Marque pronto quando quiser começar. O anfitrião abre o leilão.');
 }
 function mpSeatsClick(e) {
   if (e.target.closest('#lb-add')) { mpSend({ t: 'addBot' }); return; }
@@ -2870,25 +2941,35 @@ function mpEnd(m) {
 function onSay(msg) { $('#on-msg').textContent = msg || ''; }
 function onOpenPoll() {
   clearInterval(MP.poll); onRefresh();
-  MP.poll = setInterval(() => { if (!vis('online')) { clearInterval(MP.poll); return; } onRefresh(); }, 5000);
+  MP.poll = setInterval(() => { if (!vis('online')) { clearInterval(MP.poll); return; } if (!document.hidden) onRefresh(); }, 8000);
 }
 function onOpen() { onSay(''); show('online'); onOpenPoll(); }
 async function onRefresh() {
   try { const r = await fetch('/api/rooms', { cache: 'no-store' }); MP.list = (await r.json()).rooms || []; } catch (e) { MP.list = null; }
   if (vis('online')) onList();
+  if (vis('setup')) homeList();
 }
-function onList() {
-  const el = $('#on-list'), L2 = MP.list;
-  if (L2 === null) { el.innerHTML = `<div class="empty">${t('Não consegui carregar a lista.')}</div>`; return; }
-  if (!L2.length) { el.innerHTML = `<div class="empty">${t('Nenhuma sala pública aberta agora. Crie a sua!')}</div>`; return; }
-  el.innerHTML = L2.map(r => `<div class="seat">${badge(r.emb, 44)}<div class="sn"><b>${esc(r.auto || !r.host ? emN(r.emb) : r.host)}</b><small>${r.n}/${r.max} · ${r.code}</small></div><button class="go" data-join="${r.code}">${t('Entrar')}</button></div>`).join('');
+const LOCK = '<svg class="lk" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-label="com senha"><path d="M7 10V8a5 5 0 0 1 10 0v2h1.5A1.5 1.5 0 0 1 20 11.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19.5v-8A1.5 1.5 0 0 1 5.5 10zm2 0h6V8a3 3 0 0 0-6 0z"/></svg>';
+function roomsHTML() {
+  const L2 = MP.list;
+  if (L2 === null) return `<div class="empty">${t('Não consegui carregar a lista.')}</div>`;
+  if (!L2.length) return `<div class="empty">${t('Nenhuma sala pública aberta agora. Crie a sua!')}</div>`;
+  return L2.map(r => `<div class="seat">${badge(r.emb, 44)}<div class="sn"><b>${esc(r.auto || !r.host ? emN(r.emb) : r.host)}</b><small>${r.n}/${r.max} · ${r.code}${r.lock ? LOCK : ''}</small></div><button class="go" data-join="${r.code}" ${r.lock ? 'data-lock="1"' : ''}>${t('Entrar')}</button></div>`).join('');
+}
+function onList() { $('#on-list').innerHTML = roomsHTML(); }
+function homeList() { $('#home-list').innerHTML = roomsHTML(); }
+function homeRefresh() { if (MP_ON) onRefresh(); }
+function roomClick(e) {
+  const b = e.target.closest('[data-join]'); if (!b) return;
+  if (b.dataset.lock) { onOpen(); $('#on-code').value = b.dataset.join; onSay(t('Essa sala tem senha. Digite a senha e toque em Entrar.')); setTimeout(() => $('#on-pw').focus(), 60); return; }
+  onJoin(b.dataset.join);
 }
 function onJoin(code) {
   code = String(code || '').toUpperCase().replace(/[^A-Z2-9]/g, '');
   if (code.length !== 4) { onSay(t('Digite o código de 4 letras.')); return; }
-  onSay(''); MP.newCode = 0; mpConnect(code, false, false);
+  onSay(''); MP.newCode = 0; mpConnect(code, false, false, $('#on-pw').value.trim());
 }
-function onCreate(pub) { onSay(''); MP.newCode = 0; mpConnect(mkCode(), true, pub); }
+function onCreate(pub) { onSay(''); MP.newCode = 0; mpConnect(mkCode(), true, pub, $('#on-pw').value.trim()); }
 $('#go-online').onclick = onOpen;
 $('#on-back').onclick = () => { clearInterval(MP.poll); show('setup'); };
 $('#on-priv').onclick = () => onCreate(false);
@@ -2897,10 +2978,13 @@ $('#on-join').onclick = () => onJoin($('#on-code').value);
 $('#on-code').oninput = e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z2-9]/g, ''); };
 $('#on-code').onkeydown = e => { if (e.key === 'Enter') onJoin(e.target.value); };
 $('#on-refresh').onclick = onRefresh;
-$('#on-list').onclick = e => { const b = e.target.closest('[data-join]'); if (b) onJoin(b.dataset.join); };
+$('#on-list').onclick = roomClick;
+$('#home-list').onclick = roomClick;
+$('#home-refresh').onclick = onRefresh;
 
 if (MP_ON) {
   $('#go-online').hidden = false; $('#go-solo').hidden = false; $('#go-lobby').hidden = true;
+  $('#home-rooms').hidden = false; homeRefresh(); setInterval(() => { if (vis('setup') && !document.hidden) onRefresh(); }, 10000);
   $('#join-off').hidden = true; $('#note-off').hidden = true; $('#lead-off').hidden = true; $('#lead-on').hidden = false;
   // link de convite: ?sala=ABCD
   try {

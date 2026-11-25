@@ -12,10 +12,10 @@ const seatName = s => s.auto || !s.name ? emN(s.emb) : s.name;
 const mpIsHost = () => !!(MP.lobby && MP.lobby.seats.some(s => s.uid === MP.lobby.you && s.host));
 const mpOthers = () => MP.lobby ? MP.lobby.seats.filter(s => s.uid !== MP.lobby.you).map(s => ({ emb: s.emb, name: seatName(s) })) : [];
 
-function mpConnect(code, create, pub) {
+function mpConnect(code, create, pub, pw) {
   if (MP.ws) { try { MP.ws.onclose = null; MP.ws.close(); } catch (e) { } }
   clearTimeout(MP.retryT);
-  Object.assign(MP, { code, create, pub, joined: false, left: false, tries: 0, lobby: null, host: false, seed: null, phase: 'lobby', prev: null });
+  Object.assign(MP, { code, create, pub, pw: pw || '', joined: false, left: false, tries: 0, lobby: null, host: false, seed: null, phase: 'lobby', prev: null });
   G.mp = true; L.mp = true; L.bots = []; L.log = []; L.seen = new Set();
   mpOpen();
   clearInterval(MP.pingT); MP.pingT = setInterval(() => mpSend({ t: 'ping' }), 20000);
@@ -24,7 +24,7 @@ function mpOpen() {
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/${MP.code}`); MP.ws = ws;
   ws.onopen = () => {
     netBanner(false);
-    ws.send(JSON.stringify({ t: 'join', tok: mpTok(), name: L.auto ? '' : L.name, auto: L.auto, emb: L.emb, create: MP.create && !MP.joined, pub: MP.pub }));
+    ws.send(JSON.stringify({ t: 'join', tok: mpTok(), name: L.auto ? '' : L.name, auto: L.auto, emb: L.emb, create: MP.create && !MP.joined, pub: MP.pub, pw: MP.pw }));
   };
   ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (x) { return; } mpMsg(m); };
   ws.onclose = () => {
@@ -54,11 +54,13 @@ function mpMsg(m) {
     case 'start': return mpStartMsg(m);
     case 's': return mpSnap(m);
     case 'end': return mpEnd(m);
-    case 'season': MP.seed = m.seed; if (G.mp && vis('results') && !$('#season').hidden) svStart($('#season'), me().id, false); return;
+    case 'season': MP.seed = m.seed; if (G.mp && vis('results')) { svStart($('#season'), me().id, false); $('#sim').textContent = t('Refazer temporada'); $('#sim').hidden = !MP.host; $('#sim-wait').hidden = true; $('#season').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' }); } return;
+    case 'round': if (G.mp && vis('results') && SV.S && SV.done === m.n && !LV.running) { svStartRound(); if (MP.watch != null) { svOpen(MP.watch); MP.watch = null; } } return;
     case 'closed': return mpFail(t('A sala foi encerrada.'));
     case 'err': {
       if (m.code === 'bug') return;
-      if (m.code === 'exists' && MP.create && !MP.joined && MP.newCode++ < 8) return mpConnect(mkCode(), true, MP.pub);
+      if (m.code === 'exists' && MP.create && !MP.joined && MP.newCode++ < 8) return mpConnect(mkCode(), true, MP.pub, MP.pw);
+      if (m.code === 'pass') { $('#on-code').value = MP.code; mpFail(t(m.wrong ? 'Senha incorreta.' : 'Essa sala tem senha. Digite a senha e toque em Entrar.')); setTimeout(() => $('#on-pw').focus(), 60); return; }
       const msg = { none: 'Sala não encontrada. Confira o código.', started: 'O leilão dessa sala já começou.', full: 'Essa sala está cheia.', kicked: 'O anfitrião tirou você da sala.', tok: 'Erro de identificação. Recarregue a página.' }[m.code] || 'Não deu pra entrar na sala.';
       return mpFail(t(msg));
     }
@@ -89,25 +91,31 @@ function lobbyMode() {
   const on = !!L.mp;
   $('#lb-tag-l').hidden = on; $('#lb-tag-o').hidden = !on;
   const l = $('#lb-tk-l'), o = $('#lb-tk-o'); o.hidden = !on; l.hidden = on && true;
+  if (on) o.textContent = t(MP.lobby && MP.lobby.lock ? 'Sala com senha: passe o código e a senha. O link sozinho não entra.' : 'Passe o código ou o link pros amigos entrarem na sala.');
   if (!on && MP_ON) l.textContent = t('Sala de treino: você e os bots.');
   $('#lb-copy').hidden = !on; $('#lb-copy').textContent = t(MP.copyT ? 'Copiado!' : 'Copiar link');
 }
 function mpPaintSeats(seat) {
   const m = MP.lobby, host = mpIsHost(), me0 = m.seats.find(s => s.uid === m.you), rest = m.seats.filter(s => s.uid !== m.you);
-  let h = seat('me', L.emb, L.name || t('Seu Time'), t(me0 && me0.host ? 'Você · anfitrião' : 'Você'), 'me');
+  let h = seat('me', L.emb, L.name || t('Seu Time'), t(me0 && me0.host ? 'Você · anfitrião' : me0 && me0.ready ? 'Você · pronto' : 'Você'), me0 && me0.ready && !me0.host ? 'me rdy' : 'me');
   h += rest.map(s => {
-    const nm = seatName(s), tag = s.kind === 'bot' ? t('Bot · pronto') : !s.on ? t('Reconectando…') : t(s.host ? 'Anfitrião' : 'Na sala');
+    const nm = seatName(s), tag = s.kind === 'bot' ? t('Bot · pronto') : !s.on ? t('Reconectando…') : t(s.host ? 'Anfitrião' : s.ready ? 'Pronto' : 'Na sala');
     const x = host ? `<button class="x" data-rm="${s.uid}" aria-label="${esc(t('Tirar {n}', { n: nm }))}">×</button>` : '';
-    return seat('u' + s.uid, s.emb, nm, tag, s.on ? '' : 'away', x);
+    return seat('u' + s.uid, s.emb, nm, tag, (s.on ? '' : 'away') + (s.kind === 'human' && s.ready && !s.host ? ' rdy' : ''), x);
   }).join('');
   if (host && m.seats.length < m.max) h += `<button class="seat dash" id="lb-add"><span class="plus">+</span><div class="sn"><b>${t('Adicionar bot')}</b><small>${t('Preenche a vaga')}</small></div></button>`;
   h += `<button class="seat dash" id="lb-invite"><span class="plus">＋</span><div class="sn"><b>${t('Convidar amigo')}</b><small>${t('Copiar o link da sala')}</small></div></button>`;
   $('#lb-seats').innerHTML = h;
 }
 function mpPaintGo(n) {
-  if (mpIsHost()) return;
-  $('#lb-go').textContent = t('Aguardando o anfitrião'); $('#lb-go').disabled = true;
-  $('#lb-note').textContent = t('O anfitrião decide quando abrir o leilão.');
+  const m = MP.lobby, mine = m.seats.find(x => x.uid === m.you), wait = m.seats.filter(x => !x.ready).length;
+  if (mpIsHost()) {
+    if (n >= MIN_TEAMS && wait) { $('#lb-go').textContent = tpl('Aguardando {n} jogador ficar pronto', 'Aguardando {n} jogadores ficarem prontos', wait); $('#lb-go').disabled = true; $('#lb-note').textContent = t('Os outros jogadores marcam "Estou pronto" pra você abrir o leilão.'); }
+    return;
+  }
+  const r = !!(mine && mine.ready);
+  $('#lb-go').textContent = t(r ? 'Cancelar pronto' : 'Estou pronto'); $('#lb-go').disabled = false;
+  $('#lb-note').textContent = t(r ? 'Pronto! O anfitrião abre o leilão quando todos estiverem prontos.' : 'Marque pronto quando quiser começar. O anfitrião abre o leilão.');
 }
 function mpSeatsClick(e) {
   if (e.target.closest('#lb-add')) { mpSend({ t: 'addBot' }); return; }
@@ -178,25 +186,35 @@ function mpEnd(m) {
 function onSay(msg) { $('#on-msg').textContent = msg || ''; }
 function onOpenPoll() {
   clearInterval(MP.poll); onRefresh();
-  MP.poll = setInterval(() => { if (!vis('online')) { clearInterval(MP.poll); return; } onRefresh(); }, 5000);
+  MP.poll = setInterval(() => { if (!vis('online')) { clearInterval(MP.poll); return; } if (!document.hidden) onRefresh(); }, 8000);
 }
 function onOpen() { onSay(''); show('online'); onOpenPoll(); }
 async function onRefresh() {
   try { const r = await fetch('/api/rooms', { cache: 'no-store' }); MP.list = (await r.json()).rooms || []; } catch (e) { MP.list = null; }
   if (vis('online')) onList();
+  if (vis('setup')) homeList();
 }
-function onList() {
-  const el = $('#on-list'), L2 = MP.list;
-  if (L2 === null) { el.innerHTML = `<div class="empty">${t('Não consegui carregar a lista.')}</div>`; return; }
-  if (!L2.length) { el.innerHTML = `<div class="empty">${t('Nenhuma sala pública aberta agora. Crie a sua!')}</div>`; return; }
-  el.innerHTML = L2.map(r => `<div class="seat">${badge(r.emb, 44)}<div class="sn"><b>${esc(r.auto || !r.host ? emN(r.emb) : r.host)}</b><small>${r.n}/${r.max} · ${r.code}</small></div><button class="go" data-join="${r.code}">${t('Entrar')}</button></div>`).join('');
+const LOCK = '<svg class="lk" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-label="com senha"><path d="M7 10V8a5 5 0 0 1 10 0v2h1.5A1.5 1.5 0 0 1 20 11.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19.5v-8A1.5 1.5 0 0 1 5.5 10zm2 0h6V8a3 3 0 0 0-6 0z"/></svg>';
+function roomsHTML() {
+  const L2 = MP.list;
+  if (L2 === null) return `<div class="empty">${t('Não consegui carregar a lista.')}</div>`;
+  if (!L2.length) return `<div class="empty">${t('Nenhuma sala pública aberta agora. Crie a sua!')}</div>`;
+  return L2.map(r => `<div class="seat">${badge(r.emb, 44)}<div class="sn"><b>${esc(r.auto || !r.host ? emN(r.emb) : r.host)}</b><small>${r.n}/${r.max} · ${r.code}${r.lock ? LOCK : ''}</small></div><button class="go" data-join="${r.code}" ${r.lock ? 'data-lock="1"' : ''}>${t('Entrar')}</button></div>`).join('');
+}
+function onList() { $('#on-list').innerHTML = roomsHTML(); }
+function homeList() { $('#home-list').innerHTML = roomsHTML(); }
+function homeRefresh() { if (MP_ON) onRefresh(); }
+function roomClick(e) {
+  const b = e.target.closest('[data-join]'); if (!b) return;
+  if (b.dataset.lock) { onOpen(); $('#on-code').value = b.dataset.join; onSay(t('Essa sala tem senha. Digite a senha e toque em Entrar.')); setTimeout(() => $('#on-pw').focus(), 60); return; }
+  onJoin(b.dataset.join);
 }
 function onJoin(code) {
   code = String(code || '').toUpperCase().replace(/[^A-Z2-9]/g, '');
   if (code.length !== 4) { onSay(t('Digite o código de 4 letras.')); return; }
-  onSay(''); MP.newCode = 0; mpConnect(code, false, false);
+  onSay(''); MP.newCode = 0; mpConnect(code, false, false, $('#on-pw').value.trim());
 }
-function onCreate(pub) { onSay(''); MP.newCode = 0; mpConnect(mkCode(), true, pub); }
+function onCreate(pub) { onSay(''); MP.newCode = 0; mpConnect(mkCode(), true, pub, $('#on-pw').value.trim()); }
 $('#go-online').onclick = onOpen;
 $('#on-back').onclick = () => { clearInterval(MP.poll); show('setup'); };
 $('#on-priv').onclick = () => onCreate(false);
@@ -205,10 +223,13 @@ $('#on-join').onclick = () => onJoin($('#on-code').value);
 $('#on-code').oninput = e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z2-9]/g, ''); };
 $('#on-code').onkeydown = e => { if (e.key === 'Enter') onJoin(e.target.value); };
 $('#on-refresh').onclick = onRefresh;
-$('#on-list').onclick = e => { const b = e.target.closest('[data-join]'); if (b) onJoin(b.dataset.join); };
+$('#on-list').onclick = roomClick;
+$('#home-list').onclick = roomClick;
+$('#home-refresh').onclick = onRefresh;
 
 if (MP_ON) {
   $('#go-online').hidden = false; $('#go-solo').hidden = false; $('#go-lobby').hidden = true;
+  $('#home-rooms').hidden = false; homeRefresh(); setInterval(() => { if (vis('setup') && !document.hidden) onRefresh(); }, 10000);
   $('#join-off').hidden = true; $('#note-off').hidden = true; $('#lead-off').hidden = true; $('#lead-on').hidden = false;
   // link de convite: ?sala=ABCD
   try {

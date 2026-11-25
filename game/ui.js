@@ -90,7 +90,7 @@ function tween(el, to, fmt, from) {
   };
   el._r = requestAnimationFrame(step);
 }
-function show(id) { if (id !== 'results' && id !== 'cup') svStop(); if (id === 'setup' && G.mp) mpLeave(); for (const s of ['setup', 'lab', 'cup', 'online', 'lobby', 'auction', 'results']) $('#' + s).hidden = s !== id; window.scrollTo(0, 0); }
+function show(id) { if (id !== 'results' && id !== 'cup') svStop(); if (id === 'setup' && G.mp) mpLeave(); if (id === 'setup' && MP_ON && typeof homeRefresh === 'function') homeRefresh(); for (const s of ['setup', 'lab', 'cup', 'online', 'lobby', 'auction', 'results']) $('#' + s).hidden = s !== id; window.scrollTo(0, 0); }
 
 
 // ----- banco de narração (sem números; {q}=QB {r}=RB {w}=WR {e}=TE {t}=tackle {g}=guard {c}=center | defesa: {ed}{dt}{lb}{cb} | {O}=ataque {D}=defesa {oc}=cidade do ataque) -----
@@ -307,6 +307,7 @@ function paintLobby() {
   if (L.mp) mpPaintGo(n);
 }
 $('#go-lobby').onclick = $('#go-solo').onclick = () => { L.mp = false; openLobby(!L.log.length || L.wasMp); L.wasMp = false; };
+$('#r-home').onclick = () => { svStop(); SV.el = null; show('setup'); };
 $('#lb-back').onclick = () => show('setup');
 $('#lb-name').oninput = e => {
   L.name = e.target.value.slice(0, 44); L.auto = L.name === emN(L.emb); if (L.mp) mpName();
@@ -328,7 +329,7 @@ $('#lb-seats').onclick = e => {
   if (x) { const b = L.bots.find(q => q.uid === +x.dataset.rm); L.bots = L.bots.filter(q => q !== b); L.seen.delete('b' + b.uid); logL('Saiu da sala: {n}', { n: b.name }); paintLobby(); }
 };
 $('#lb-go').onclick = () => {
-  if (L.mp) { mpSend({ t: 'start' }); return; }
+  if (L.mp) { if (mpIsHost()) mpSend({ t: 'start' }); else { const m = MP.lobby, me0 = m.seats.find(x => x.uid === m.you); mpSend({ t: 'ready', on: !(me0 && me0.ready) }); } return; }
   G.mp = false; G.meId = 0; G.A = null;
   const flat = {}; POS_ORDER.forEach(p => flat[p] = 1);
   G.name = (L.name.trim() || emN(L.emb)).slice(0, 44);
@@ -343,6 +344,25 @@ $('#lb-go').onclick = () => {
   show('auction'); paintAuction(true, 16);
   cancelAnimationFrame(G.raf); G.last = performance.now(); G.raf = requestAnimationFrame(frame);
 };
+
+// ----- sons (WebAudio, sem arquivos): "up" curtinho a cada lance -----
+const sfx = {
+  on: (() => { try { return localStorage.getItem('fa-snd') !== '0'; } catch (e) { return true; } })(), ctx: null,
+  unlock() { if (!sfx.ctx) { try { sfx.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; } } if (sfx.ctx.state === 'suspended') sfx.ctx.resume(); },
+  up(mine) {
+    if (!sfx.on || !sfx.ctx || sfx.ctx.state !== 'running') return;
+    const nw = performance.now(); if (nw - (sfx.last || 0) < 110) return; sfx.last = nw;
+    const c = sfx.ctx, t0 = c.currentTime, f = mine ? [620, 930] : [440, 560], v = mine ? .16 : .07;
+    const o = c.createOscillator(), g = c.createGain(); o.type = 'triangle';
+    o.frequency.setValueAtTime(f[0], t0); o.frequency.setValueAtTime(f[1], t0 + .07);
+    g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(v, t0 + .015); g.gain.exponentialRampToValueAtTime(.001, t0 + .22);
+    o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + .24);
+  },
+  paint() { const b = $('#a-snd'); if (b) { b.classList.toggle('off', !sfx.on); b.setAttribute('aria-pressed', String(sfx.on)); b.setAttribute('aria-label', t(sfx.on ? 'Som ligado' : 'Som desligado')); } }
+};
+document.addEventListener('pointerdown', sfx.unlock); document.addEventListener('keydown', sfx.unlock);
+$('#a-snd').onclick = () => { sfx.on = !sfx.on; try { localStorage.setItem('fa-snd', sfx.on ? '1' : '0'); } catch (e) { } sfx.paint(); if (sfx.on) sfx.up(true); };
+sfx.paint();
 
 // ----- leilão -----
 const me = () => G.teams[G.meId || 0];
@@ -403,6 +423,7 @@ function paintAuction(force, dt) {
   const fk = A.i + ':' + A.nBids;
   if (G.feedKey !== fk || force) {
     G.feedKey = fk;
+    { const lb = A.bids[A.bids.length - 1]; if (!force && lb && lb.kind !== 'pass' && G.feedI === A.i) sfx.up(lb.team === M); G.feedI = A.i; }
     const nm = tm => tm === M ? t('Você') : tm.name, last = A.bids.slice(-3).reverse();
     $('#s-feed').innerHTML = last.length ? last.map((b, i) => b.kind === 'pass'
       ? `<div class="bl out ${b.team === M ? 'me' : ''} ${i === 0 ? 'new' : ''}"><span class="w">${esc(nm(b.team))}</span><span class="d">${t('saiu do lance')}</span><b></b></div>`
@@ -516,7 +537,7 @@ function paintLineup() {
 }
 function openPosInfo() {
   const row = s => ([p, n, q, d]) => `<div class="pi"><span class="pos ${s}">${p}</span><div><b>${n}<em>${tpl('{n} vaga', '{n} vagas', q)} · ${nf(WEIGHT[p].toFixed(2).replace(/0$/, ''))}x</em></b><p>${t(d)}</p></div></div>`;
-  $('#posinfo-b').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE · tem a bola')}</div>${POSINFO.off.map(row('off')).join('')}<div class="sub">${t('DEFESA · tenta tomar a bola')}</div>${POSINFO.def.map(row('def')).join('')}<p class="sh-n">${t('O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.')}</p>`;
+  $('#posinfo-b').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE · tem a bola')}</div>${POSINFO.off.map(row('off')).join('')}<div class="sub">${t('DEFESA · tenta tomar a bola')}</div>${POSINFO.def.map(row('def')).join('')}<p class="sh-n">${t('O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR, LB e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.')}</p>`;
   $('#posinfo').hidden = false; $('#posinfo-b').scrollTop = 0;
 }
 $('#pos-info').onclick = openPosInfo;
@@ -608,7 +629,8 @@ function paintResults() {
   $('#r-teams').innerHTML = `<tr><th>${t('TIME')}</th><th>${t('ATQ')}</th><th>${t('DEF')}</th><th>${t('GERAL')}</th><th>${t('SOBROU')}</th></tr>` +
     sorted.map((t, i) => `<tr class="rvf ${t.human ? 'me' : ''}" style="--i:${i + 8}"><td><span class="tn">${badge(t.emb, 22)}${esc(t.name)}</span></td><td class="num">${t.rt.off.toFixed(1)}</td><td class="num">${t.rt.def.toFixed(1)}</td><td class="num"><b>${t.rt.all.toFixed(1)}</b></td><td class="num">${dollars(t.budget)}</td></tr>`).join('');
   $('#sim').textContent = t($('#season').hidden ? 'Simular temporada' : 'Refazer temporada');
-  $('#sim').hidden = !!(G.mp && !MP.host && !$('#season').hidden);
+  $('#sim').hidden = !!(G.mp && !MP.host);
+  $('#sim-wait').hidden = !(G.mp && !MP.host && $('#season').hidden);
 }
 const tn = id => G.teams.find(t => t.id === id);
 // ----- temporada em rodadas ao vivo: todos os jogos da rodada acontecem ao mesmo tempo -----
@@ -637,7 +659,8 @@ function liveTimeline(g) {
 function svStartRound() {
   const r = SV.S.rounds[SV.done]; if (!r || LV.running) return;
   LV.games = {}; LV.now = 0; LV.endAt = 0; LV.nDone = 0; LV.running = true;
-  r.games.forEach(g => { const i = SV.S.games.indexOf(g); LV.games[i] = Object.assign({ g, i, n: 0, shown: 0, done: false, score: [0, 0] }, liveTimeline(g)); });
+  const mk = () => r.games.forEach(g => { const i = SV.S.games.indexOf(g); LV.games[i] = Object.assign({ g, i, n: 0, shown: 0, done: false, score: [0, 0] }, liveTimeline(g)); });
+  if (G.mp && !SV.cup) withSeed(MP.seed + 100 + SV.done, mk); else mk();
   svRender();
   const y = SV.el.querySelector('.yard'); if (y) y.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
   LV.last = performance.now(); LV.raf = requestAnimationFrame(svTick);
@@ -674,7 +697,7 @@ function svGameDone(L) {
 function svRoundDone() { LV.running = false; SV.done++; svRender(); }
 function svOpen(i) {
   const g = SV.S.games[i]; if (!g || g.round > SV.done) return;
-  if (g.round === SV.done && !LV.running) svStartRound();
+  if (g.round === SV.done && !LV.running) { if (G.mp && !SV.cup) return; svStartRound(); }
   openGame(i);
 }
 function svMatch(g) {
@@ -712,11 +735,12 @@ function svRender() {
   let head = '';
   if (fin) head = `<div class="champ pop"><div class="cb">${badge(champ.emb, 68)}<div><small>${t(champ.id === me ? 'VOCÊ GANHOU O SUPER BOWL' : 'CAMPEÃO DO SUPER BOWL')}</small><h2>${esc(champ.name)}</h2></div></div></div>${me >= 0 ? `<p class="note" style="margin-top:12px">${svSummary()}</p><div class="pact"><button class="btn ghost full" data-act="card">${t('Cartão da temporada')}</button></div>` : ''}${statsHTML(S)}`;
   else {
+    const wait = G.mp && !SV.cup && !MP.host;
     const n = cur.games.length, hasMine = me >= 0 && cur.games.some(g => g.a === me || g.b === me);
     head = `<div class="card prog"><small>${t(cur.kind === 'reg' ? 'TEMPORADA REGULAR' : 'MATA-MATA')}</small><h3>${esc(rl(cur.label))}</h3>
       <div class="pbar"><i style="width:${(100 * d / R.length).toFixed(1)}%"></i></div>
       <p class="note">${LV.running ? t('Ao vivo · {b} jogos terminados. Todos rolam ao mesmo tempo.', { b: `<b id="sv-fin" style="color:var(--flag)">${t('{a} de {b}', { a: LV.nDone, b: n })}</b>` }) : `${d === 0 ? t('Sorteio feito: {n} rodadas + mata-mata. ', { n: regTotal }) : ''}${tpl('{n} jogo ao mesmo tempo, em tempo real.', '{n} jogos ao mesmo tempo, em tempo real.', n)}`}</p>
-      <div class="pact">${LV.running ? '' : `<button class="btn full" data-act="start">${t('Iniciar rodada')}</button>`}${hasMine ? `<button class="btn ${LV.running ? '' : 'ghost'} full" data-act="mine">${t(LV.running ? 'Assistir meu jogo' : 'Iniciar e assistir meu jogo')}</button>` : ''}<button class="btn ghost full" data-act="speed">${t('Velocidade {n}×', { n: SV.speed })}</button></div></div>`;
+      <div class="pact">${LV.running ? '' : wait ? `<p class="note" style="margin:0">${t('Aguardando o anfitrião iniciar a rodada. Todos começam juntos.')}</p>` : `<button class="btn full" data-act="start">${t('Iniciar rodada')}</button>`}${hasMine && (LV.running || !wait) ? `<button class="btn ${LV.running ? '' : 'ghost'} full" data-act="mine">${t(LV.running ? 'Assistir meu jogo' : 'Iniciar e assistir meu jogo')}</button>` : ''}<button class="btn ghost full" data-act="speed">${t('Velocidade {n}×', { n: SV.speed })}</button></div></div>`;
   }
   const poRounds = R.filter(r => r.kind === 'po');
   SV.el.innerHTML = `<div class="svg"><div class="svc">${head}
@@ -737,8 +761,12 @@ document.addEventListener('click', e => {
   const act = e.target.closest('[data-act]');
   if (act) {
     const k = act.dataset.act;
-    if (k === 'start') svStartRound();
-    else if (k === 'mine') { const r = SV.S.rounds[SV.done], g = r && r.games.find(x => x.a === SV.meId || x.b === SV.meId); if (g) svOpen(SV.S.games.indexOf(g)); }
+    if (k === 'start') { if (G.mp && !SV.cup) { if (MP.host) mpSend({ t: 'round', n: SV.done }); } else svStartRound(); }
+    else if (k === 'mine') {
+      const r = SV.S.rounds[SV.done], g = r && r.games.find(x => x.a === SV.meId || x.b === SV.meId); if (!g) return;
+      if (G.mp && !SV.cup && !LV.running) { MP.watch = SV.S.games.indexOf(g); mpSend({ t: 'round', n: SV.done }); return; }
+      svOpen(SV.S.games.indexOf(g));
+    }
     else if (k === 'card') { const f = svFate(); openShare(f.M, { text: f.cardTxt, rec: f.rs, gold: f.champ === f.M }); }
     else if (k === 'speed') { SV.speed = SV.speed === 1 ? 2 : SV.speed === 2 ? 4 : 1; el.querySelectorAll('[data-act=speed]').forEach(b => b.textContent = t('Velocidade {n}×', { n: SV.speed })); }
     return;
@@ -754,7 +782,7 @@ document.addEventListener('click', e => {
 
 // jogo de verdade: depois do leilão, a temporada anda jogo a jogo
 $('#sim').onclick = () => {
-  if (G.mp && !$('#season').hidden) { if (MP.host) mpSend({ t: 'reseason' }); return; }
+  if (G.mp) { if (MP.host) mpSend({ t: 'reseason' }); return; }
   svStart($('#season'), me().id, false);
   $('#sim').textContent = t('Refazer temporada');
   $('#sim').hidden = !!(G.mp && !MP.host);

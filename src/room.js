@@ -13,7 +13,7 @@ export class Room extends DurableObject {
     this.init();
   }
   init() {
-    Object.assign(this, { created: false, pub: false, phase: 'lobby', seats: [], uid: 0, A: null, teams: null, seed: null, code: '', sentV: -1, lastSync: 0, hold: 0, key: '', active: Date.now(), emptyAt: 0, lastReg: 0 });
+    Object.assign(this, { created: false, pub: false, pw: '', phase: 'lobby', seats: [], uid: 0, A: null, teams: null, seed: null, code: '', sentV: -1, lastSync: 0, hold: 0, key: '', active: Date.now(), emptyAt: 0, lastReg: 0 });
   }
 
   async fetch(req) {
@@ -56,7 +56,8 @@ export class Room extends DurableObject {
       case 'bid': case 'pass': return this.play(c, s, m);
     }
     if (this.phase === 'lobby') this.lobbyMsg(c, s, m);
-    else if (this.phase === 'done' && m.t === 'reseason' && s.host) { this.seed = seedNow(); this.all({ t: 'season', seed: this.seed }); }
+    else if (this.phase === 'done' && m.t === 'reseason' && s.host) { this.seed = seedNow(); this.rd = 0; this.all({ t: 'season', seed: this.seed }); }
+    else if (this.phase === 'done' && m.t === 'round' && s.host) { const n = m.n | 0; if (n === (this.rd | 0)) { this.rd = n + 1; this.all({ t: 'round', n }); } }
   }
 
   join(c, m) {
@@ -66,8 +67,9 @@ export class Room extends DurableObject {
     let s = this.seats.find(x => x.tok === tok);
     if (!this.created) {
       if (!m.create) return this.send(c, { t: 'err', code: 'none' });
-      this.created = true; this.pub = !!m.pub; this.startHousekeeping();
+      this.created = true; this.pub = !!m.pub; this.pw = String(m.pw || '').slice(0, 24); this.startHousekeeping();
     } else if (m.create && !s) return this.send(c, { t: 'err', code: 'exists' });
+    else if (!s && this.pw && String(m.pw || '').slice(0, 24) !== this.pw) return this.send(c, { t: 'err', code: 'pass', wrong: !!m.pw });
     if (s) {                                               // reconexão: assume o assento de volta
       if (s.c && s.c !== c) { s.c.seat = null; try { s.c.ws.close(1000, 'outra aba'); } catch (e) { } this.conns.delete(s.c); }
       s.c = c; s.awayAt = 0; c.seat = s;
@@ -111,17 +113,19 @@ export class Room extends DurableObject {
       case 'name': s.name = clean(m.name); s.auto = !s.name; break;
       case 'addBot': if (s.host && this.seats.length < MAX_SEATS) { const e = this.validEmb(m.emb) ? m.emb : this.freeEmb(); this.seats.push({ uid: ++this.uid, kind: 'bot', name: '', emb: e, auto: true, host: false }); } break;
       case 'rm': { const t = this.seatOf(m.uid); if (s.host && t && t !== s) { if (t.kind === 'human') this.kick(t); this.seats = this.seats.filter(x => x !== t); } break; }
-      case 'start': if (s.host && this.seats.length >= MIN_TEAMS) return this.start(); break;
+      case 'ready': if (!s.host) s.ready = !!m.on; break;
+      case 'start': if (s.host && this.seats.length >= MIN_TEAMS && this.allReady()) return this.start(); break;
       default: return;
     }
     this.pushLobby(); this.register();
   }
+  allReady() { return this.seats.every(x => x.kind === 'bot' || x.host || x.ready); }
   kick(t) { if (t.c) { this.send(t.c, { t: 'err', code: 'kicked' }); t.c.seat = null; try { t.c.ws.close(1000, 'expulso'); } catch (e) { } this.conns.delete(t.c); t.c = null; } }
-  lobbyView() { return { t: 'lobby', code: this.code, pub: this.pub, max: MAX_SEATS, min: MIN_TEAMS, seats: this.seats.map(s => ({ uid: s.uid, kind: s.kind, name: s.name, emb: s.emb, auto: s.auto, host: !!s.host, on: s.kind === 'bot' || !!s.c })) }; }
+  lobbyView() { return { t: 'lobby', code: this.code, pub: this.pub, lock: !!this.pw, max: MAX_SEATS, min: MIN_TEAMS, seats: this.seats.map(s => ({ uid: s.uid, kind: s.kind, name: s.name, emb: s.emb, auto: s.auto, host: !!s.host, ready: s.kind === 'bot' || !!s.host || !!s.ready, on: s.kind === 'bot' || !!s.c })) }; }
   pushLobby() { const v = this.lobbyView(); for (const c of this.conns) if (c.seat) this.send(c, { ...v, you: c.seat.uid }); }
   register() {
     const h = this.host(), open = this.created && this.pub && this.phase === 'lobby' && !!h;
-    const body = open ? { code: this.code, host: h.name, auto: h.auto, emb: h.emb, n: this.seats.length, max: MAX_SEATS, open: true } : { code: this.code };
+    const body = open ? { code: this.code, host: h.name, auto: h.auto, emb: h.emb, n: this.seats.length, max: MAX_SEATS, lock: !!this.pw, open: true } : { code: this.code };
     this.lastReg = Date.now();
     try { this.env.LOBBY.get(this.env.LOBBY.idFromName('main')).fetch('https://lobby/' + (open ? 'upsert' : 'remove'), { method: 'POST', body: JSON.stringify(body) }).catch(() => { }); } catch (e) { }
   }
@@ -175,7 +179,7 @@ export class Room extends DurableObject {
   sendEnd(c) { this.send(c, this.endView()); }
   finish() {
     clearInterval(this.loop); this.teams.forEach(finishTeam);
-    this.phase = 'done'; this.seed = seedNow(); this.active = Date.now();
+    this.phase = 'done'; this.rd = 0; this.seed = seedNow(); this.active = Date.now();
     this.all(this.endView());
   }
 
@@ -198,6 +202,6 @@ export class Room extends DurableObject {
     this.phase = 'closed'; this.register();
     this.timers.forEach(clearInterval); this.timers = [];
     for (const c of this.conns) { this.send(c, { t: 'closed', why }); try { c.ws.close(1000, why); } catch (e) { } }
-    this.conns.clear(); this.seats = []; this.A = null; this.created = false;
+    this.conns.clear(); this.seats = []; this.A = null; this.created = false; this.pw = '';
   }
 }

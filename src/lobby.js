@@ -14,7 +14,7 @@ export class Lobby extends DurableObject {
     }
     for (const [k, v] of this.rooms) if (now - v.ts > TTL) this.rooms.delete(k);
     const list = [...this.rooms.values()].filter(r => r.open).sort((a, b) => b.n - a.n).slice(0, 30)
-      .map(r => ({ code: r.code, host: r.host, emb: r.emb, n: r.n, max: r.max }));
+      .map(r => ({ code: r.code, host: r.host, auto: r.auto, emb: r.emb, n: r.n, max: r.max, lock: !!r.lock }));
     return new Response(JSON.stringify({ rooms: list }), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
   }
 }
