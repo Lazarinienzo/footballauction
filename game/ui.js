@@ -589,14 +589,14 @@ const POSINFO = {
 const wfmt = x => nf(x.toFixed(2).replace(/0+$/, '').replace(/\.$/, ''));
 function fieldHTML(side, rows, o) {
   const by = {}; rows.forEach(r => (by[r.pos] = by[r.pos] || []).push(r));
-  const form = o.form || STD, sp = SPOT[side][form[side]], xs = Object.values(SPOT[side]).flat().map(q => q[2]), x0 = Math.min(...xs), span = Math.max(...xs) - x0 + 1.2, rowsN = 3;
+  const form = o.form || STD, sp = SPOT[side][form[side]], xs = Object.values(SPOT[side]).flat().map(q => q[2]), x0 = Math.min(...xs), span = Math.max(...xs) - x0 + 1, rowsN = 3;
   const cells = sp.map(([pos, i, x, y]) => {
     const r = by[pos][i], want = o.cur && !r.p && o.cur.pos === pos, isNew = o.newId != null && r.p && r.p.id === o.newId, lk = r.p && o.linked && o.linked.has(r.p.id);
-    const logo = r.p ? badge(frIdx(r.p), 34) : '<span class="plus">+</span>';
+    const logo = r.p ? badge(frIdx(r.p), 40) : '<span class="plus">+</span>';
     const bn = r.p && o.bw && o.bw[side] ? o.bw[side].get(r.p.id) || 0 : 0, w = wOf(side, form[side], pos);
     const wt = (w + bn).toFixed(1) !== w.toFixed(1) ? `<em class="up" title="${t('Sinergia')} +${wfmt(bn)}x">▲${nf((w + bn).toFixed(1))}x</em>` : '';
     const sel = o.sel && o.sel.pos === pos ? (o.sel.bid == null && o.sel.i === i ? 'sel' : 'tgt') : '';
-    return `<div class="tk ${side} ${r.p ? '' : 'empty'} ${want ? 'want' : ''} ${isNew ? 'new' : ''} ${lk ? 'lk' : ''} ${sel}" data-pos="${pos}" data-i="${i}" data-id="${r.p ? r.p.id : ''}" style="left:${(x - x0 + .6) / span * 100}%;top:calc(${y} * var(--rh));width:${100 / span}%${lk ? ';--tc:' + EMB[frIdx(r.p)][1] : ''}"><div class="r"><span class="c">${logo}</span><span class="ov num">${r.p ? r.p.ovr : ''}</span></div><small>${r.p ? esc(shortName(r.p.name)) : ''}</small><b>${pos}${wt}</b></div>`;
+    return `<div class="tk ${side} ${r.p ? '' : 'empty'} ${want ? 'want' : ''} ${isNew ? 'new' : ''} ${lk ? 'lk' : ''} ${sel}" data-pos="${pos}" data-i="${i}" data-id="${r.p ? r.p.id : ''}" style="left:${(x - x0 + .5) / span * 100}%;top:calc(${y} * var(--rh));width:${100 / span}%${lk ? ';--tc:' + EMB[frIdx(r.p)][1] : ''}"><span class="c">${logo}</span><small>${r.p ? esc(shortName(r.p.name)) : ''}</small><b>${pos}${wt}</b><span class="ov num">${r.p ? r.p.ovr : ''}</span></div>`;
   });
   const got = rows.filter(r => r.p).length;
   const sy = o.syn && o.syn[side] ? `<span class="sy">${t('Sinergia')} +${nf(o.syn[side].toFixed(1))}</span>` : '', up = o.up && o.up[side] ? `<span class="sy up">${t('Esse lote liga com seu time')} +${nf(o.up[side].toFixed(1))}</span>` : '';
@@ -608,7 +608,7 @@ function benchHTML(T, ord, o) {
   const pl = benchOf(T.roster, ord), n = Math.max(pl.length, (T.total || TOTAL_SLOTS) - TOTAL_SLOTS), toks = [];
   for (let k = 0; k < n; k++) {
     const p = pl[k], want = o.benchWant && !p, sel = o.sel && p ? (o.sel.bid === p.id ? 'sel' : o.sel.pos === p.pos ? 'tgt' : '') : '';
-    toks.push(`<div class="tk bn ${p ? (OFF_POS.includes(p.pos) ? 'off' : 'def') : 'off'} ${p ? '' : 'empty'} ${want ? 'want' : ''} ${sel}" data-pos="${p ? p.pos : ''}" data-bid="${p ? p.id : ''}"><div class="r"><span class="c">${p ? badge(frIdx(p), 34) : '<span class="plus">+</span>'}</span><span class="ov num">${p ? p.ovr : ''}</span></div><small>${p ? esc(shortName(p.name)) : ''}</small><b>${p ? p.pos : t('livre')}</b></div>`);
+    toks.push(`<div class="tk bn ${p ? (OFF_POS.includes(p.pos) ? 'off' : 'def') : 'off'} ${p ? '' : 'empty'} ${want ? 'want' : ''} ${sel}" data-pos="${p ? p.pos : ''}" data-bid="${p ? p.id : ''}"><span class="c">${p ? badge(frIdx(p), 40) : '<span class="plus">+</span>'}</span><small>${p ? esc(shortName(p.name)) : ''}</small><b>${p ? p.pos : t('livre')}</b><span class="ov num">${p ? p.ovr : ''}</span></div>`);
   }
   return `<div class="fld bnc"><div class="fh"><span>${t('RESERVAS')} · ${t('qualquer posição')}</span><span class="num">${pl.length}/${n}</span></div><div class="bg">${toks.join('')}</div></div>`;
 }
@@ -630,16 +630,29 @@ function tapField(T, ctx, k) {
 }
 function setForm(T, ctx, side, f) { T.form = { ...(T.form || STD), [side]: f }; T.order = normOrder(T.roster, T.order, T.form); ctx.sel = null; }
 // linhas de sinergia estilo FIFA: ligam os titulares do mesmo time da NFL, na cor do time
-function drawLinks(links, root, focus) {
+// Linhas de sinergia: saem da borda do escudo de um jogador até a borda do vizinho, com o valor do link escrito em cima da linha.
+// Link na horizontal: borda a borda, valor acima. Link na vertical/diagonal: sai de baixo do texto do jogador de cima até o escudo de baixo, valor ao lado.
+function drawLinks(links, root) {
   root = root || '#fm';
   const run = () => ['off', 'def'].forEach((sd, k) => {
     const fg = $(root).querySelectorAll('.fg')[k]; if (!fg || !links[sd].length) return;
-    const R0 = fg.getBoundingClientRect(), pt = id => { const c = fg.querySelector(`.tk[data-id="${id}"] .c`); if (!c) return null; const b = c.getBoundingClientRect(); return [b.left + b.width / 2 - R0.left, b.top + b.height / 2 - R0.top]; };
-    let svg = '';
-    for (const l of links[sd]) { const a = pt(l.a.id), b = pt(l.b.id); if (!a || !b) continue; const col = EMB[frIdx(l.a)][1];
-      svg += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#04121a" stroke-width="5" stroke-linecap="round" opacity=".45"/><line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${col}" stroke-width="2.5" stroke-linecap="round" opacity=".9"/>`;
+    const R0 = fg.getBoundingClientRect(), el = id => fg.querySelector(`.tk[data-id="${id}"]`);
+    const geo = id => { const e = el(id); if (!e) return null; const c = e.querySelector('.c').getBoundingClientRect(), w = e.getBoundingClientRect(); return { x: c.left + c.width / 2 - R0.left, y: c.top + c.height / 2 - R0.top, r: c.width / 2 + 2, top: c.top - R0.top - 2, bot: w.bottom - R0.top + 1 }; };
+    let svg = '', txt = '';
+    for (const l of links[sd]) {
+      let A = geo(l.a.id), B = geo(l.b.id); if (!A || !B) continue;
+      const col = EMB[frIdx(l.a)][1], v = nf(l.pts.toFixed(1)); let x1, y1, x2, y2, tx, ty, anc = 'middle';
+      if (Math.abs(B.x - A.x) >= Math.abs(B.y - A.y)) {            // horizontal: da borda de um escudo à borda do outro
+        const dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy), ux = dx / d, uy = dy / d;
+        x1 = A.x + ux * A.r; y1 = A.y + uy * A.r; x2 = B.x - ux * B.r; y2 = B.y - uy * B.r; tx = (x1 + x2) / 2; ty = (y1 + y2) / 2 - 4;
+      } else {                                                      // vertical: debaixo do texto de cima até o topo do escudo de baixo
+        if (A.y > B.y) [A, B] = [B, A];
+        x1 = A.x; y1 = A.bot; x2 = B.x; y2 = B.top; tx = (x1 + x2) / 2 + 5; ty = (y1 + y2) / 2 + 3.5; anc = 'start';
+      }
+      svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#04121a" stroke-width="5" stroke-linecap="round" opacity=".45"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="2.5" stroke-linecap="round"/>`;
+      txt += `<text x="${tx}" y="${ty}" text-anchor="${anc}" class="lv">${v}</text>`;
     }
-    fg.insertAdjacentHTML('afterbegin', `<svg class="lk" width="${R0.width}" height="${R0.height}">${svg}</svg>`);
+    fg.insertAdjacentHTML('afterbegin', `<svg class="lk" width="${R0.width}" height="${R0.height}">${svg}${txt}</svg>`);
   });
   requestAnimationFrame(run);
 }
