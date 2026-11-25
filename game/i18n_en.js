@@ -1,6 +1,5 @@
 I18N.en = {
   'Atalhos: teclas 1 a 4 dão lance, P passa a vaga.': 'Shortcuts: keys 1 to 4 place a bid, P passes the lot.',
-"Beta": "Beta",
 "Um leilão com jogadores da NFL:": "An auction with NFL players:",
 "monte seu time e ganhe o Super Bowl contra os seus amigos!": "build your team and win the Super Bowl against your friends!",
 "Crie uma sala, escolha seu escudo e entre no leilão. O online com amigos vem a seguir.": "Create a room, pick your crest and jump into the auction. Online play with friends is coming next.",
