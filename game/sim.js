@@ -128,12 +128,12 @@ const validForm = f => { const o = {}; for (const sd of ['off', 'def']) o[sd] = 
 const feasible = (roster, side, f) => { const fs = formSlots({ ...STD, [side]: f }); return [...new Set(SPOT[side][f].map(q => q[0]))].every(pos => roster.filter(p => p.pos === pos).length >= fs[pos]); };
 const kperms = (a, k) => k <= 0 ? [[]] : a.length === 0 ? [Array(k).fill(null)] : a.flatMap((x, i) => kperms(a.filter((_, j) => j !== i), k - 1).map(r => [x, ...r]));
 // melhor plano (formação + quem joga onde) pra um elenco: maximiza o OVR de cada lado (média ponderada + sinergia). Usado pelos bots.
-function autoPlan(roster, bench) {
+function autoPlan(roster, bench, stdOnly) {
   const form = { ...STD }; let order = normOrder(roster, null, form);
   for (const side of ['off', 'def']) {
     let best = null;
     for (const f of Object.keys(FORMS[side])) {
-      if (f !== 'std' && !feasible(roster, side, f)) continue;
+      if (f !== 'std' && (stdOnly || !feasible(roster, side, f))) continue;
       const fm = { ...form, [side]: f }, base = normOrder(roster, order, fm), fs = formSlots(fm);
       const poss = [...new Set(SPOT[side][f].map(q => q[0]))], pools = poss.map(pos => kperms(roster.filter(x => x.pos === pos).map(x => x.id), fs[pos]));
       const go = (k, cur) => {
@@ -511,4 +511,57 @@ function simSeason(teams, confs) {
   return { confs, table, games, rounds, champion, finalists: champs.length > 1 ? [x, y] : [champs[0]] };
 }
 
-if (typeof module !== 'undefined') module.exports = { SPOT, FORMS, STD, BENCH_TOTAL, FW, wOf, feasible, canForm, mand, freeSlots, formSlots, cfgTeam, validForm, SYN_W, SYN_CAP, synLinks, synInfo, normOrder, autoPlan, sideStarters, WEIGHT, SIM, POSSESSIONS, pTD, pFG, driveOdds, TAKE, SLOTS, POS_ORDER, OFF_POS, TOTAL_SLOTS, BUDGET, lineup, ratings, simGame, Auction, newBot, maxTeams, makePool, finishTeam, simSeason, drawConferences, buildTables, makeRounds, confName, qualifiers, MIN_TEAMS, MAX_CONF, need, slotsLeft, maxBid, duel, shortName, withSeed, mulberry32, rint, R };
+// ---------- modo Duelo (1 contra 1): cartas viradas, posição por posição ----------
+// Cada rodada sorteia uma posição. Cada jogador tem o SEU tabuleiro de n cartas (as mesmas pessoas podem aparecer nos dois). Vira f às cegas e escolhe k entre as viradas.
+// Quem começa alterna a cada rodada; quem joga depois vê o que o outro virou. Formação padrão pros dois.
+const DU_CFG = { QB: { n: 5, f: 3, k: 1 }, RB: { n: 5, f: 3, k: 1 }, WR: { n: 5, f: 3, k: 2 }, TE: { n: 5, f: 3, k: 1 }, OL: { n: 6, f: 4, k: 3 }, EDGE: { n: 5, f: 3, k: 2 }, DT: { n: 5, f: 3, k: 2 }, LB: { n: 5, f: 3, k: 2 }, CB: { n: 5, f: 3, k: 2 } };
+const DU_TURN_MS = 30000;
+class Duelo {
+  constructor(db, o) {
+    o = o || {}; this.db = db.map((p, i) => ({ ...p, id: i })); this.show = !!o.show;
+    this.first = o.first != null ? o.first : rint(0, 1); this.rounds = shuffle(POS_ORDER); this.r = 0; this.picks = [[], []]; this.done = false; this.draw();
+  }
+  get pos() { return this.rounds[this.r]; }
+  get cfg() { return DU_CFG[this.pos]; }
+  draw() {
+    const pos = this.pos, c = DU_CFG[pos], all = this.db.filter(p => p.pos === pos);
+    this.board = [0, 1].map(() => shuffle(all).slice(0, c.n).map(p => p.id));
+    this.fl = [[], []]; this.sel = [[], []]; this.ok = [false, false]; this.cur = (this.r + this.first) % 2;
+  }
+  flip(p, i) { const c = this.cfg; if (this.done || p !== this.cur || this.ok[p] || !Number.isInteger(i) || i < 0 || i >= c.n || this.fl[p].includes(i) || this.fl[p].length >= c.f) return false; this.fl[p].push(i); return true; }
+  pick(p, i) {
+    const c = this.cfg; if (this.done || p !== this.cur || this.ok[p] || this.fl[p].length < c.f || !this.fl[p].includes(i)) return false;
+    const s = this.sel[p], k = s.indexOf(i); if (k >= 0) s.splice(k, 1); else if (s.length < c.k) s.push(i); else return false; return true;
+  }
+  confirm(p) {
+    const c = this.cfg; if (this.done || p !== this.cur || this.ok[p] || this.sel[p].length !== c.k) return false;
+    this.ok[p] = true; this.picks[p].push(...this.sel[p].map(i => this.board[p][i]));
+    if (this.ok[1 - p]) { if (++this.r >= this.rounds.length) this.done = true; else this.draw(); } else this.cur = 1 - p;
+    return true;
+  }
+  // jogada automática (tempo esgotado, jogador fora, bot): vira ao acaso e fica com os melhores OVR. noise > 0 deixa o bot menos perfeito.
+  auto(p, noise) {
+    if (this.done || p !== this.cur || this.ok[p]) return false;
+    const c = this.cfg, rest = shuffle([...Array(c.n).keys()].filter(i => !this.fl[p].includes(i)));
+    while (this.fl[p].length < c.f) this.fl[p].push(rest.shift());
+    const sc = i => this.db[this.board[p][i]].ovr + (noise ? (R() - .5) * 2 * noise : 0);
+    this.sel[p] = this.fl[p].slice().sort((a, b) => sc(b) - sc(a)).slice(0, c.k);
+    return this.confirm(p);
+  }
+  // o que o jogador p pode ver: só as cartas viradas (as fechadas nem saem do servidor); as escolhas do rival aparecem quando ele confirma
+  view(p) {
+    const q = 1 - p, side = x => ({ cards: this.board[x].map((id, i) => this.fl[x].includes(i) ? id : null), fl: this.fl[x].slice(), sel: x === p || this.ok[x] ? this.sel[x].slice() : [], ok: this.ok[x] });
+    return { r: this.r, of: this.rounds.length, rounds: this.rounds, pos: this.done ? null : this.pos, cfg: this.done ? null : this.cfg, cur: this.cur, first: this.first, show: this.show, done: this.done, me: side(p), opp: side(q), picks: [this.picks[p].slice(), this.picks[q].slice()] };
+  }
+  // times montados (formação padrão pros dois), prontos pra simular
+  teams(info) {
+    return [0, 1].map(p => {
+      const roster = this.picks[p].map(id => ({ ...this.db[id], paid: 0 }));
+      const t = cfgTeam({ id: p, name: (info && info[p] && info[p].name) || 'T' + p, emb: info && info[p] ? info[p].emb : p, human: true, budget: 0, roster }, false);
+      t.form = { ...STD }; t.order = autoPlan(roster, false, true).order; return finishTeam(t);
+    });
+  }
+}
+function duelGame(teams, seed) { return withSeed(seed, () => simGame(teams[0], teams[1], { noTie: true })); }
+
+if (typeof module !== 'undefined') module.exports = { SPOT, FORMS, STD, BENCH_TOTAL, FW, wOf, feasible, canForm, mand, freeSlots, formSlots, cfgTeam, validForm, SYN_W, SYN_CAP, synLinks, synInfo, normOrder, autoPlan, sideStarters, WEIGHT, SIM, POSSESSIONS, pTD, pFG, driveOdds, TAKE, SLOTS, POS_ORDER, OFF_POS, TOTAL_SLOTS, BUDGET, lineup, ratings, simGame, Auction, newBot, maxTeams, makePool, finishTeam, simSeason, drawConferences, buildTables, makeRounds, confName, qualifiers, MIN_TEAMS, MAX_CONF, need, slotsLeft, maxBid, duel, shortName, withSeed, mulberry32, rint, R, Duelo, duelGame, DU_CFG, DU_TURN_MS };

@@ -97,7 +97,7 @@ function tween(el, to, fmt, from) {
   };
   el._r = requestAnimationFrame(step);
 }
-function show(id) { if (id !== 'results' && id !== 'cup') svStop(); if (id === 'setup' && G.mp) mpLeave(); if (id === 'setup' && MP_ON && typeof homeRefresh === 'function') homeRefresh(); for (const s of ['setup', 'sandbox', 'lab', 'cup', 'online', 'lobby', 'auction', 'results']) $('#' + s).hidden = s !== id; window.scrollTo(0, 0); }
+function show(id) { if (id !== 'results' && id !== 'cup') svStop(); if (id === 'setup' && G.mp) mpLeave(); if (id === 'setup' && MP_ON && typeof homeRefresh === 'function') homeRefresh(); for (const s of ['setup', 'sandbox', 'lab', 'cup', 'online', 'duel', 'lobby', 'auction', 'results']) $('#' + s).hidden = s !== id; window.scrollTo(0, 0); }
 
 
 // ----- banco de narração (sem números; {q}=QB {r}=RB {w}=WR {e}=TE {t}=tackle {g}=guard {c}=center | defesa: {ed}{dt}{lb}{cb} | {O}=ataque {D}=defesa {oc}=cidade do ataque) -----
@@ -1333,5 +1333,6 @@ function setLang(l) {
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-lang]'); if (b) setLang(b.dataset.lang); });
 /*MPCLIENT*/
+/*DUEL*/
 collectStatic(); mountLang(); applyStatic();
 document.querySelectorAll('.lang button').forEach(b => { const on = b.dataset.lang === LANG; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
