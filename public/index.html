@@ -767,7 +767,7 @@ html,body{overflow-x:hidden}
 .inst .dc .in{transition:none!important}
 .dc .face{position:absolute;inset:0;border-radius:16px;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:8px 4px;text-align:center;min-width:0}
 .dc .fbk{background:linear-gradient(150deg,#14407f,#0a1d44 70%);color:rgba(255,255,255,.8);border:1.5px solid rgba(255,255,255,.24)}
-.dc .fbk small{font-size:9.5px;letter-spacing:.04em;font-weight:600;opacity:.88}.dc .fbk small b{color:var(--hi)}
+.dc .fbk small{font-size:7.5px;letter-spacing:0;font-weight:600;opacity:.88;white-space:nowrap;max-width:100%}.dc .fbk small b{color:var(--hi)}
 .dc.can .fbk{box-shadow:0 0 0 2px rgba(246,214,74,.55)}
 .dc .fft{transform:rotateY(180deg);--cb:#16213f;color:#fff;border:3px solid transparent;background:linear-gradient(var(--cb),var(--cb)) padding-box,linear-gradient(135deg,rgba(255,255,255,.28),rgba(255,255,255,.12)) border-box}
 html[data-theme=light] .dc .fft{--cb:#fffdf7;color:#0f1a38}
@@ -778,12 +778,24 @@ html[data-theme=light] .dc .fft{--cb:#fffdf7;color:#0f1a38}
 .dc.sel .ck{display:block}
 .dc.sel .fft{box-shadow:0 0 0 3px var(--hi),0 0 18px rgba(246,214,74,.45)}
 .dc.can.flipped:active .in{transform:rotateY(180deg) scale(.97)}
-/* bordas por faixa de OVR (só com o OVR visível) */
+/* bordas por faixa de OVR */
 .dc .fft.t-bronze{background:linear-gradient(var(--cb),var(--cb)) padding-box,linear-gradient(135deg,#f0b27a,#8a4f1d 55%,#d99a5b) border-box}
 .dc .fft.t-gold{background:linear-gradient(var(--cb),var(--cb)) padding-box,linear-gradient(135deg,#fff3a8,#f1c232 50%,#b8860b) border-box;box-shadow:0 0 12px rgba(241,194,50,.35)}
 .dc .fft.t-diamond{background:linear-gradient(var(--cb),var(--cb)) padding-box,linear-gradient(135deg,#c9f6ff,#5fb4ff 35%,#e6d2ff 65%,#7ff0ff) border-box;box-shadow:0 0 16px rgba(127,227,255,.6);animation:dudia 2.2s ease-in-out infinite alternate}
 .dc.sel .fft.t-bronze,.dc.sel .fft.t-gold,.dc.sel .fft.t-diamond{box-shadow:0 0 0 3px var(--hi),0 0 18px rgba(246,214,74,.45)}
 @keyframes dudia{from{filter:brightness(1)}to{filter:brightness(1.22)}}
+/* carta diamante (90+) */
+.dc.legend .fft{animation:dushine 1.4s ease-out 1,dudia 2.2s ease-in-out 1.4s infinite alternate}
+.dc.legend::before{content:"";position:absolute;inset:-6px;border-radius:22px;pointer-events:none;z-index:3;background:radial-gradient(circle,rgba(255,255,255,.95) 0 6%,rgba(127,227,255,.7) 14%,transparent 62%);animation:duburst 1.1s ease-out both}
+.dc.legend::after{content:"";position:absolute;inset:0;border-radius:16px;pointer-events:none;z-index:3;overflow:hidden;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.75) 50%,transparent 65%);background-size:250% 100%;background-position:150% 0;animation:dusweep 1.3s ease-in-out .15s 2 both}
+@keyframes duburst{from{transform:scale(.3);opacity:1}to{transform:scale(2.4);opacity:0}}
+@keyframes dusweep{to{background-position:-60% 0}}
+@keyframes dushine{0%{transform:rotateY(180deg) scale(1)}30%{transform:rotateY(180deg) scale(1.1);filter:brightness(1.7)}100%{transform:rotateY(180deg) scale(1)}}
+.dstage.glow{animation:duglow 2.4s ease-out}
+@keyframes duglow{0%,100%{box-shadow:none}25%{box-shadow:inset 0 0 70px rgba(127,227,255,.6),0 0 30px rgba(127,227,255,.4)}}
+.dlegend{position:absolute;left:0;right:0;top:42%;z-index:6;text-align:center;font-family:var(--display);font-weight:800;font-size:28px;letter-spacing:.14em;color:#fff;text-shadow:0 0 12px #5fb4ff,0 0 28px #7ff0ff,0 2px 0 rgba(0,0,0,.5);pointer-events:none;animation:dubanner 2.4s cubic-bezier(.2,.9,.3,1) both}
+.dlegend span{color:#9be9ff;font-size:.7em}
+@keyframes dubanner{0%{transform:scale(.3);opacity:0}15%{transform:scale(1.2);opacity:1}28%{transform:scale(1)}80%{opacity:1}100%{transform:translateY(-14px) scale(1.05);opacity:0}}
 .dleg{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:10px 2px 0;font-size:12.5px;color:var(--mute);min-height:18px}
 .tdot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:-4px}
 .tdot.b{background:linear-gradient(135deg,#f0b27a,#8a4f1d)}.tdot.g{background:linear-gradient(135deg,#fff3a8,#b8860b)}.tdot.d{background:linear-gradient(135deg,#c9f6ff,#5fb4ff,#e6d2ff)}
@@ -810,7 +822,7 @@ html[data-theme=light] .dc .fft{--cb:#fffdf7;color:#0f1a38}
 .dpks{display:flex;flex-wrap:wrap;gap:5px}
 .dpk{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 8px 3px 6px;border-radius:99px;background:var(--wash2)}
 .dpk b{font-size:10px;letter-spacing:.05em;color:var(--mute)}.dpk i{font-style:normal;font-weight:600}.dpk em{font-style:normal;font-weight:800;color:var(--hi)}
-@media (prefers-reduced-motion:reduce){.dealing .dc,.leaving .dc,.dc .in,.reel.landed,.strip{animation:none!important;transition:none!important}.dc .fft.t-diamond{animation:none}}
+@media (prefers-reduced-motion:reduce){.dealing .dc,.leaving .dc,.dc .in,.reel.landed,.strip{animation:none!important;transition:none!important}.dc .fft.t-diamond,.dc.legend .fft,.dc.legend::before,.dc.legend::after,.dstage.glow{animation:none!important}}
 </style>
 </head>
 <body>
@@ -1661,7 +1673,7 @@ class Duelo {
   flip(p, i) { const c = this.cfg; if (this.done || p !== this.cur || this.ok[p] || !Number.isInteger(i) || i < 0 || i >= c.n || this.fl[p].includes(i) || this.fl[p].length >= c.f) return false; this.fl[p].push(i); return true; }
   pick(p, i) {
     const c = this.cfg; if (this.done || p !== this.cur || this.ok[p] || this.fl[p].length < c.f || !this.fl[p].includes(i)) return false;
-    const s = this.sel[p], k = s.indexOf(i); if (k >= 0) s.splice(k, 1); else if (s.length < c.k) s.push(i); else return false; return true;
+    const s = this.sel[p], k = s.indexOf(i); if (k >= 0) s.splice(k, 1); else { if (s.length >= c.k) s.shift(); s.push(i); } return true;
   }
   confirm(p) {
     const c = this.cfg; if (this.done || p !== this.cur || this.ok[p] || this.sel[p].length !== c.k) return false;
@@ -2255,6 +2267,8 @@ Object.assign(I18N.en, {
  "Ouro": "Gold",
  "Diamante": "Diamond"
 });
+
+Object.assign(I18N.en, {'DIAMANTE': 'DIAMOND'});
 const MP_ON = true;      // o build online troca por true (precisa do servidor Cloudflare)
 // ---------- interface ----------
 const $ = s => document.querySelector(s);
@@ -4075,8 +4089,17 @@ function dtShow(tg, anim) {
   if (anim) dtAt(ready, c.n * T_DEALK + T_DEAL); else ready();
 }
 function dtFront(id) {
-  const p = duP(id), tier = DU.show ? duTier(p.ovr) : 'plain';
+  const p = duP(id), tier = duTier(p.ovr);
   return [`face fft t-${tier}`, `${badge(frIdx(p), 46)}<span class="dn">${esc(p.name)}</span><span class="dp">${p.pos} · ${esc(p.tm)}</span><span class="dov num">${DU.show ? p.ovr : '??'}</span><i class="ck">✓</i>`];
+}
+// carta 90+ virada: brilho, explosão de faíscas e faixa "DIAMANTE" na mesa
+function dtLegend(el, root) {
+  dtAt(() => {
+    el.classList.add('legend');
+    const b = document.createElement('div'); b.className = 'dlegend'; b.innerHTML = '<span>◆</span> ' + t('DIAMANTE') + ' <span>◆</span>';
+    root.appendChild(b); root.classList.add('glow');
+    setTimeout(() => { b.remove(); root.classList.remove('glow'); }, 2400);
+  }, 650);
 }
 // atualiza a mesa no lugar (sem recriar as cartas, senão a animação de virar se perde)
 function dtUpdate() {
@@ -4085,7 +4108,7 @@ function dtUpdate() {
   const can = dtCan(), canFlip = can && side.fl.length < c.f, canPick = can && side.fl.length >= c.f;
   root.querySelectorAll('.dc').forEach(el => {
     const i = +el.dataset.i, fl = side.fl.includes(i);
-    if (fl && !el.classList.contains('flipped')) { const f = el.querySelector('.fft'), [cls, html] = dtFront(side.cards[i]); f.className = cls; f.innerHTML = html; el.classList.add('flipped'); }
+    if (fl && !el.classList.contains('flipped')) { const f = el.querySelector('.fft'), [cls, html] = dtFront(side.cards[i]); f.className = cls; f.innerHTML = html; el.classList.add('flipped'); if (cls.includes('t-diamond') && !root.firstChild.classList.contains('inst')) dtLegend(el, root); }
     el.classList.toggle('sel', side.sel.includes(i));
     el.classList.toggle('can', (canFlip && !fl) || (canPick && fl));
     el.tabIndex = el.classList.contains('can') ? 0 : -1;
@@ -4097,7 +4120,7 @@ function dtUpdate() {
     ? (side.ok ? t('Você escolheu.') : flipping ? tpl('Sua vez: vire {n} carta.', 'Sua vez: vire {n} cartas.', c.f - side.fl.length) : t('Escolha {k} das {f} cartas viradas.', { k: c.k, f: c.f }))
     : (side.ok ? t('{n} escolheu.', { n: duSeat(d.who).name }) : flipping ? t('{n} está virando as cartas…', { n: duSeat(d.who).name }) : t('{n} está escolhendo…', { n: duSeat(d.who).name }));
   $('#dt-act').innerHTML = canPick ? `<button class="btn full" id="du-ok" ${side.sel.length === c.k ? '' : 'disabled'} style="margin-top:12px">${t('Confirmar')} (${side.sel.length}/${c.k})</button>` : '';
-  $('#dt-leg').innerHTML = DU.show ? `<i class="tdot b"></i>${t('Bronze')} 70–79 <i class="tdot g"></i>${t('Ouro')} 80–89 <i class="tdot d"></i>${t('Diamante')} 90+` : '';
+  $('#dt-leg').innerHTML = `<i class="tdot b"></i>${t('Bronze')} 70–79 <i class="tdot g"></i>${t('Ouro')} 80–89 <i class="tdot d"></i>${t('Diamante')} 90+`;
   duTickUI();
 }
 // a escolha fica na mesa um instante, depois as cartas saem

@@ -212,8 +212,17 @@ function dtShow(tg, anim) {
   if (anim) dtAt(ready, c.n * T_DEALK + T_DEAL); else ready();
 }
 function dtFront(id) {
-  const p = duP(id), tier = DU.show ? duTier(p.ovr) : 'plain';
+  const p = duP(id), tier = duTier(p.ovr);
   return [`face fft t-${tier}`, `${badge(frIdx(p), 46)}<span class="dn">${esc(p.name)}</span><span class="dp">${p.pos} · ${esc(p.tm)}</span><span class="dov num">${DU.show ? p.ovr : '??'}</span><i class="ck">✓</i>`];
+}
+// carta 90+ virada: brilho, explosão de faíscas e faixa "DIAMANTE" na mesa
+function dtLegend(el, root) {
+  dtAt(() => {
+    el.classList.add('legend');
+    const b = document.createElement('div'); b.className = 'dlegend'; b.innerHTML = '<span>◆</span> ' + t('DIAMANTE') + ' <span>◆</span>';
+    root.appendChild(b); root.classList.add('glow');
+    setTimeout(() => { b.remove(); root.classList.remove('glow'); }, 2400);
+  }, 650);
 }
 // atualiza a mesa no lugar (sem recriar as cartas, senão a animação de virar se perde)
 function dtUpdate() {
@@ -222,7 +231,7 @@ function dtUpdate() {
   const can = dtCan(), canFlip = can && side.fl.length < c.f, canPick = can && side.fl.length >= c.f;
   root.querySelectorAll('.dc').forEach(el => {
     const i = +el.dataset.i, fl = side.fl.includes(i);
-    if (fl && !el.classList.contains('flipped')) { const f = el.querySelector('.fft'), [cls, html] = dtFront(side.cards[i]); f.className = cls; f.innerHTML = html; el.classList.add('flipped'); }
+    if (fl && !el.classList.contains('flipped')) { const f = el.querySelector('.fft'), [cls, html] = dtFront(side.cards[i]); f.className = cls; f.innerHTML = html; el.classList.add('flipped'); if (cls.includes('t-diamond') && !root.firstChild.classList.contains('inst')) dtLegend(el, root); }
     el.classList.toggle('sel', side.sel.includes(i));
     el.classList.toggle('can', (canFlip && !fl) || (canPick && fl));
     el.tabIndex = el.classList.contains('can') ? 0 : -1;
@@ -234,7 +243,7 @@ function dtUpdate() {
     ? (side.ok ? t('Você escolheu.') : flipping ? tpl('Sua vez: vire {n} carta.', 'Sua vez: vire {n} cartas.', c.f - side.fl.length) : t('Escolha {k} das {f} cartas viradas.', { k: c.k, f: c.f }))
     : (side.ok ? t('{n} escolheu.', { n: duSeat(d.who).name }) : flipping ? t('{n} está virando as cartas…', { n: duSeat(d.who).name }) : t('{n} está escolhendo…', { n: duSeat(d.who).name }));
   $('#dt-act').innerHTML = canPick ? `<button class="btn full" id="du-ok" ${side.sel.length === c.k ? '' : 'disabled'} style="margin-top:12px">${t('Confirmar')} (${side.sel.length}/${c.k})</button>` : '';
-  $('#dt-leg').innerHTML = DU.show ? `<i class="tdot b"></i>${t('Bronze')} 70–79 <i class="tdot g"></i>${t('Ouro')} 80–89 <i class="tdot d"></i>${t('Diamante')} 90+` : '';
+  $('#dt-leg').innerHTML = `<i class="tdot b"></i>${t('Bronze')} 70–79 <i class="tdot g"></i>${t('Ouro')} 80–89 <i class="tdot d"></i>${t('Diamante')} 90+`;
   duTickUI();
 }
 // a escolha fica na mesa um instante, depois as cartas saem

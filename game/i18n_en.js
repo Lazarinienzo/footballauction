@@ -517,3 +517,5 @@ Object.assign(I18N.en, {
  "Ouro": "Gold",
  "Diamante": "Diamond"
 });
+
+Object.assign(I18N.en, {'DIAMANTE': 'DIAMOND'});

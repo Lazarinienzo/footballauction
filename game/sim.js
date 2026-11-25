@@ -532,7 +532,7 @@ class Duelo {
   flip(p, i) { const c = this.cfg; if (this.done || p !== this.cur || this.ok[p] || !Number.isInteger(i) || i < 0 || i >= c.n || this.fl[p].includes(i) || this.fl[p].length >= c.f) return false; this.fl[p].push(i); return true; }
   pick(p, i) {
     const c = this.cfg; if (this.done || p !== this.cur || this.ok[p] || this.fl[p].length < c.f || !this.fl[p].includes(i)) return false;
-    const s = this.sel[p], k = s.indexOf(i); if (k >= 0) s.splice(k, 1); else if (s.length < c.k) s.push(i); else return false; return true;
+    const s = this.sel[p], k = s.indexOf(i); if (k >= 0) s.splice(k, 1); else { if (s.length >= c.k) s.shift(); s.push(i); } return true;
   }
   confirm(p) {
     const c = this.cfg; if (this.done || p !== this.cur || this.ok[p] || this.sel[p].length !== c.k) return false;
