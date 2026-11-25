@@ -76,6 +76,7 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid
 .top{display:flex;align-items:center;gap:12px;padding:18px 0 4px}
 .wm{font-family:var(--display);font-weight:800;font-size:24px;letter-spacing:-.04em}
 .wm b{color:var(--hi);font-weight:800}
+.top .wm{cursor:pointer;-webkit-tap-highlight-color:transparent}.top .wm:focus-visible{outline:2px solid var(--hi);outline-offset:4px;border-radius:6px}
 .tag{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:var(--flag);color:var(--flag-ink);font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
 .tag i{width:8px;height:8px;border-radius:50%;background:#e5372a}
 .hero{padding:40px 0 26px;text-align:left}
@@ -2077,6 +2078,18 @@ $('#lb-go').onclick = () => {
   show('auction'); paintAuction(true, 16);
   cancelAnimationFrame(G.raf); G.last = performance.now(); G.raf = requestAnimationFrame(frame);
 };
+
+// ----- logo clicável: volta pro começo (usa o botão de voltar da tela atual, que já confirma quando precisa) -----
+document.querySelectorAll('header.top .wm').forEach(w => { w.setAttribute('role', 'link'); w.tabIndex = 0; w.setAttribute('aria-label', 'Touchdown Auction'); });
+function logoHome(e) {
+  const w = e.target.closest('header.top .wm'); if (!w) return;
+  if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  const back = { online: '#on-back', lobby: '#lb-back', cup: '#cup-back' };
+  const id = Object.keys(back).find(k => { const el = $('#' + k); return el && !el.hidden; });
+  if (id) $(back[id]).click(); else window.scrollTo({ top: 0, behavior: REDUCED ? 'auto' : 'smooth' });
+}
+document.addEventListener('click', logoHome); document.addEventListener('keydown', logoHome);
 
 // ----- tema claro / escuro (escuro é o padrão: azul-marinho) -----
 function themeSync() {

@@ -344,6 +344,18 @@ $('#lb-go').onclick = () => {
   cancelAnimationFrame(G.raf); G.last = performance.now(); G.raf = requestAnimationFrame(frame);
 };
 
+// ----- logo clicável: volta pro começo (usa o botão de voltar da tela atual, que já confirma quando precisa) -----
+document.querySelectorAll('header.top .wm').forEach(w => { w.setAttribute('role', 'link'); w.tabIndex = 0; w.setAttribute('aria-label', 'Touchdown Auction'); });
+function logoHome(e) {
+  const w = e.target.closest('header.top .wm'); if (!w) return;
+  if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  const back = { online: '#on-back', lobby: '#lb-back', cup: '#cup-back' };
+  const id = Object.keys(back).find(k => { const el = $('#' + k); return el && !el.hidden; });
+  if (id) $(back[id]).click(); else window.scrollTo({ top: 0, behavior: REDUCED ? 'auto' : 'smooth' });
+}
+document.addEventListener('click', logoHome); document.addEventListener('keydown', logoHome);
+
 // ----- tema claro / escuro (escuro é o padrão: azul-marinho) -----
 function themeSync() {
   const lt = document.documentElement.dataset.theme === 'light';
