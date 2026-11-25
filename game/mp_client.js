@@ -175,7 +175,7 @@ function mpSnap(s) {
 function mpEnter() {
   Object.assign(G, { shownI: -2, shownV: -1, fracShown: 1, phaseSeen: '', leaderKey: '', lastPrice: 0, flashedV: -1, btnKey: '', feedKey: '', season: null });
   $('#season').hidden = true; $('#season').innerHTML = '';
-  $('#table').innerHTML = G.teams.map(t => `<div class="trow">${badge(t.emb, 26)}<span>${esc(t.name)}${t.human ? ' (' + tt('você') + ')' : ''}</span><span class="b num"></span><span class="v"></span><span class="bb"><i></i></span></div>`).join('');
+  $('#table').innerHTML = tableHTML();
   $('#a-bud')._shown = BUDGET; $('#a-bud')._to = BUDGET; $('#a-bud').textContent = dollars(BUDGET);
   show('auction'); paintAuction(true, 16);
   cancelAnimationFrame(G.raf); G.last = performance.now(); G.raf = requestAnimationFrame(frame);

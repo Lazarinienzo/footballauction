@@ -338,7 +338,7 @@ $('#lb-go').onclick = () => {
   Object.assign(G, { shownI: -2, shownV: -1, fracShown: 1, phaseSeen: '', leaderKey: '', lastPrice: 0, flashedV: -1, btnKey: '', feedKey: '', season: null });
   $('#season').hidden = true; $('#season').innerHTML = '';
   // estruturas fixas (só atualizam texto, pra animar sem recriar)
-  $('#table').innerHTML = G.teams.map(t => `<div class="trow">${badge(t.emb, 26)}<span>${esc(t.name)}${t.human ? ' (' + tt('você') + ')' : ''}</span><span class="b num"></span><span class="v"></span><span class="bb"><i></i></span></div>`).join('');
+  $('#table').innerHTML = tableHTML();
   $('#a-bud')._shown = BUDGET; $('#a-bud')._to = BUDGET; $('#a-bud').textContent = dollars(BUDGET);
   show('auction'); paintAuction(true, 16);
   cancelAnimationFrame(G.raf); G.last = performance.now(); G.raf = requestAnimationFrame(frame);
@@ -587,16 +587,25 @@ function paintLists() {
     ? `<div class="sale"><b>${esc(s.player.name)}</b> <em>${s.player.pos} · ${s.player.ovr} · ${esc(frName(s.player))}</em><br>${t('{team} por {p}', { team: s.team.human ? '<b style="color:var(--flag)">' + t('Você') + '</b>' : esc(s.team.name), p: '<b>' + dollars(s.price) + '</b>' })} ${s.note ? '<em>(' + t(s.note) + ')</em>' : ''}</div>`
     : `<div class="sale"><b>${esc(s.player.name)}</b> <em>${s.player.pos} · ${s.player.ovr} · ${esc(frName(s.player))}</em><br><em>${s.note === 'fica pro sorteio' ? t('você passou: o jogo completa seu time no fim') : t('ninguém quis, volta depois')}</em></div>`).join('') : '<p class="note">' + t('Nenhuma venda ainda.') + '</p>';
 }
+function tableHTML() {
+  return G.teams.map(t => `<div class="tm" data-t="${t.id}" role="button" tabindex="0"><div class="th">${badge(t.emb, 22)}<span class="tn">${esc(t.name)}${t.human ? ' (' + tt('você') + ')' : ''}</span></div><div class="tb2"><b class="num tb"></b><span class="tc num"></span></div><div class="tp"></div><span class="bb"><i></i></span></div>`).join('');
+}
+// mini-campo: 4 colunas x 4 linhas (ataque em cima, defesa embaixo). Cheio = comprado, tracejado = vaga aberta
+function chipsHTML(roster, cur) {
+  return lineupRows(roster).map(r => `<span class="ch ${OFF_POS.includes(r.pos) ? 'off' : 'def'}${r.p ? '' : ' empty'}${!r.p && cur && cur.pos === r.pos ? ' want' : ''}">${r.pos}</span>`).join('');
+}
 function paintTable() {
-  const A = G.A, rows = document.querySelectorAll('#table .trow');
+  const A = G.A, cards = document.querySelectorAll('#table .tm'), cur = A.phase === 'bidding' ? A.cur : null;
   G.teams.forEach((t, i) => {
-    const r = rows[i]; if (!r) return;
+    const r = cards[i]; if (!r) return;
     r.classList.toggle('lead', A.leader === t && A.phase === 'bidding');
     r.classList.toggle('out', A.phase === 'bidding' && A.passed.has(t));
-    r.dataset.t = t.id; r.tabIndex = 0; r.setAttribute('role', 'button');
-    tween(r.children[2], t.budget, dollars);
-    setText(r.children[3], `${t.roster.length}/${TOTAL_SLOTS}`);
-    r.children[4].firstChild.style.width = t.budget + '%';
+    r.classList.toggle('me', t === me());
+    tween(r.querySelector('.tb'), t.budget, dollars);
+    setText(r.querySelector('.tc'), `${t.roster.length}/${TOTAL_SLOTS}`);
+    r.querySelector('.bb i').style.width = Math.max(0, Math.min(100, t.budget / BUDGET * 100)) + '%';
+    const key = t.roster.map(p => p.id).join(',') + '|' + (cur ? cur.pos : '');
+    if (r.dataset.k !== key) { r.dataset.k = key; r.querySelector('.tp').innerHTML = chipsHTML(t.roster, cur); }
   });
   if (!$('#tview').hidden) tvPaint(false);
 }
@@ -612,8 +621,8 @@ function tvPaint(force) {
   $('#tv-b').innerHTML = `<div class="tvh">${badge(T.emb, 40)}<small>${esc(st)}</small></div><div class="lu"><div><div class="sub" style="margin-top:0">${tt('ATAQUE')}</div>${off.map(r => slotHTML(r)).join('')}</div><div><div class="sub">${tt('DEFESA')}</div>${def.map(r => slotHTML(r)).join('')}</div></div>`;
 }
 function tvOpen(id) { TV.id = id; TV.key = ''; tvPaint(true); $('#tview').hidden = false; $('#tv-b').scrollTop = 0; }
-$('#table').addEventListener('click', e => { const r = e.target.closest('.trow[data-t]'); if (r) tvOpen(+r.dataset.t); });
-$('#table').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.trow[data-t]')) { e.preventDefault(); tvOpen(+e.target.dataset.t); } });
+$('#table').addEventListener('click', e => { const r = e.target.closest('.tm[data-t]'); if (r) tvOpen(+r.dataset.t); });
+$('#table').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.tm[data-t]')) { e.preventDefault(); tvOpen(+e.target.dataset.t); } });
 $('#tview').addEventListener('click', e => { if (e.target.closest('[data-close]')) $('#tview').hidden = true; });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#tview').hidden = true; });
 // voltar pro início no meio do leilão

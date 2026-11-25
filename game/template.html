@@ -651,6 +651,28 @@ html,body{overflow-x:hidden}
 .trow .emb,.trow>span:nth-child(2){transition:opacity .3s}
 .trow.out .emb{opacity:.28}
 .trow.out>span:nth-child(2){opacity:.55}
+/* mesa: um campinho por time */
+#table.card{background:none;border:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:10px}
+.tm{display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:16px;background:var(--panel);border:1px solid var(--line);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:border-color .2s,box-shadow .25s,opacity .3s;min-width:0}
+.tm:active{background:var(--panel2)}
+.tm .th{display:flex;align-items:center;gap:8px;min-width:0}
+.tm .tn{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.tm .tb2{display:flex;justify-content:space-between;align-items:baseline}
+.tm .tb{font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:-.02em}
+.tm .tc{font-size:12px;color:var(--mute)}
+.tm .tp{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+.tm .tp .ch:nth-child(8){margin-bottom:5px}
+.tm .ch{display:block;text-align:center;font-style:normal;font-size:9.5px;font-weight:800;letter-spacing:0;white-space:nowrap;overflow:hidden;line-height:1;padding:6px 0;border-radius:7px;border:1.5px solid transparent}
+.tm .ch.off{background:rgba(77,141,255,.24);color:var(--posoff)}
+.tm .ch.def{background:rgba(255,128,112,.22);color:var(--posdef)}
+.tm .ch.empty{background:none;border:1.5px dashed var(--edge);color:var(--mute);opacity:.85}
+.tm .ch.want{border-color:var(--hi);color:var(--hi);opacity:1;animation:tkp 1.1s ease-in-out infinite alternate}
+.tm .bb{height:3px;background:var(--wash2);border-radius:2px;overflow:hidden}
+.tm .bb i{display:block;height:100%;background:var(--mute);border-radius:2px;transition:width .7s cubic-bezier(.2,.8,.2,1),background .3s}
+.tm.me{border-color:var(--edge)}
+.tm.lead{border-color:var(--flag);box-shadow:0 0 0 1px var(--flag)}
+.tm.lead .bb i{background:var(--flag)}
+.tm.out{opacity:.55}
 .tvhint{margin:8px 2px 0;font-size:13px}
 .tvh{display:flex;align-items:center;gap:14px;margin:2px 0 6px}
 .tvh b{display:block;font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.02em}
