@@ -109,7 +109,7 @@ function mpPaintSeats(seat) {
     return seat('u' + s.uid, s.emb, nm, tag, (s.on ? '' : 'away') + (s.kind === 'human' && s.ready && !s.host ? ' rdy' : ''), x);
   }).join('');
   if (host && m.seats.length < m.max) h += `<button class="seat dash" id="lb-add"><span class="plus">+</span><div class="sn"><b>${t('Adicionar bot')}</b><small>${t('Preenche a vaga')}</small></div></button>`;
-  h += `<button class="seat dash" id="lb-invite"><span class="plus">＋</span><div class="sn"><b>${t('Convidar amigo')}</b><small>${t('Copiar o link da sala')}</small></div></button>`;
+  h += `<button class="seat dash" id="lb-invite"><span class="plus">＋</span><div class="sn"><b>${t('Convidar amigo')}</b><small>${t('Mandar o convite da sala')}</small></div></button>`;
   $('#lb-seats').innerHTML = h;
 }
 function mpPaintGo(n) {
@@ -130,8 +130,11 @@ function mpSeatsClick(e) {
 function mpName() { clearTimeout(MP.nameT); MP.nameT = setTimeout(() => mpSend({ t: 'name', name: L.auto ? '' : L.name }), 350); }
 async function mpCopy() {
   const url = `${location.origin}/?sala=${MP.code}`;
-  try { await navigator.clipboard.writeText(url); }
-  catch (e) { if (navigator.share) { try { await navigator.share({ title: 'Touchdown Auction', url }); } catch (x) { } return; } window.prompt(t('Copie o link:'), url); return; }
+  const msg = t('Bora disputar um leilão de NFL? Entra na minha sala {c} no Touchdown Auction: cada um tem US$ 200 pra montar 16 titulares.', { c: MP.code });
+  // no celular abre o compartilhar do sistema (WhatsApp etc.); no computador copia mensagem + link
+  if (navigator.share && matchMedia('(pointer:coarse)').matches) { try { await navigator.share({ title: 'Touchdown Auction', text: msg, url }); } catch (x) { } return; }
+  try { await navigator.clipboard.writeText(msg + '\n' + url); }
+  catch (e) { window.prompt(t('Copie o link:'), msg + ' ' + url); return; }
   clearTimeout(MP.copyT); MP.copyT = setTimeout(() => { MP.copyT = 0; if (vis('lobby')) lobbyMode(); }, 1600); lobbyMode();
 }
 $('#lb-copy').onclick = mpCopy;

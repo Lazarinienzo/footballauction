@@ -368,3 +368,7 @@ Object.assign(I18N.en, {
   'Não deu pra conectar. O servidor pode estar lotado ou fora do ar. Tente de novo em alguns minutos.': "Couldn't connect. The server may be full or down. Try again in a few minutes."
 });
 Object.assign(I18N.en, { 'Enviar feedback ou reportar problema': 'Send feedback or report a problem', 'Privacidade': 'Privacy', 'Termos': 'Terms', 'Conte o que aconteceu ou o que você sugere:': 'Tell us what happened or what you suggest:', 'Sala': 'Room' });
+Object.assign(I18N.en, {
+  'Mandar o convite da sala': 'Send the room invite',
+  'Bora disputar um leilão de NFL? Entra na minha sala {c} no Touchdown Auction: cada um tem US$ 200 pra montar 16 titulares.': 'Up for an NFL auction? Join my room {c} on Touchdown Auction: everyone gets $200 to build a 16-man starting lineup.'
+});
