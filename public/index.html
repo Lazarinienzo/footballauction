@@ -2347,12 +2347,12 @@ function svStartRound() {
   if (G.mp && !SV.cup) withSeed(MP.seed + 100 + SV.done, mk); else mk();
   svRender();
   const y = SV.el.querySelector('.yard'); if (y) y.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
-  LV.last = performance.now(); LV.raf = requestAnimationFrame(svTick);
+  LV.t0 = performance.now(); LV.raf = requestAnimationFrame(svTick);
 }
 function svTick(ts) {
   if (!LV.running) return;
   LV.raf = requestAnimationFrame(svTick);
-  LV.now += Math.min(250, ts - LV.last) * SV.speed; LV.last = ts;
+  LV.now = (ts - LV.t0) * SV.speed;                   // relógio de parede: todo mundo vê o mesmo momento do jogo, mesmo se a aba ficou em segundo plano
   const Ls = Object.values(LV.games);
   for (const L of Ls) {
     while (L.n < L.ev.length && L.ev[L.n].t <= LV.now) svEvent(L, L.ev[L.n++]);
@@ -2424,7 +2424,7 @@ function svRender() {
     head = `<div class="card prog"><small>${t(cur.kind === 'reg' ? 'TEMPORADA REGULAR' : 'MATA-MATA')}</small><h3>${esc(rl(cur.label))}</h3>
       <div class="pbar"><i style="width:${(100 * d / R.length).toFixed(1)}%"></i></div>
       <p class="note">${LV.running ? t('Ao vivo · {b} jogos terminados. Todos rolam ao mesmo tempo.', { b: `<b id="sv-fin" style="color:var(--flag)">${t('{a} de {b}', { a: LV.nDone, b: n })}</b>` }) : `${d === 0 ? t('Sorteio feito: {n} rodadas + mata-mata. ', { n: regTotal }) : ''}${tpl('{n} jogo ao mesmo tempo, em tempo real.', '{n} jogos ao mesmo tempo, em tempo real.', n)}`}</p>
-      <div class="pact">${LV.running ? '' : wait ? `<p class="note" style="margin:0">${t('Aguardando o anfitrião iniciar a rodada. Todos começam juntos.')}</p>` : `<button class="btn full" data-act="start">${t('Iniciar rodada')}</button>`}${hasMine && (LV.running || !wait) ? `<button class="btn ${LV.running ? '' : 'ghost'} full" data-act="mine">${t(LV.running ? 'Assistir meu jogo' : 'Iniciar e assistir meu jogo')}</button>` : ''}<button class="btn ghost full" data-act="speed">${t('Velocidade {n}×', { n: SV.speed })}</button></div></div>`;
+      <div class="pact">${LV.running ? '' : wait ? `<p class="note" style="margin:0">${t('Aguardando o anfitrião iniciar a rodada. Todos começam juntos.')}</p>` : `<button class="btn full" data-act="start">${t('Iniciar rodada')}</button>`}${hasMine && (LV.running || !wait) ? `<button class="btn ${LV.running ? '' : 'ghost'} full" data-act="mine">${t(LV.running ? 'Assistir meu jogo' : 'Iniciar e assistir meu jogo')}</button>` : ''}</div></div>`;
   }
   const poRounds = R.filter(r => r.kind === 'po');
   SV.el.innerHTML = `<div class="svg"><div class="svc">${head}
@@ -2452,7 +2452,6 @@ document.addEventListener('click', e => {
       svOpen(SV.S.games.indexOf(g));
     }
     else if (k === 'card') { const f = svFate(); openShare(f.M, { text: f.cardTxt, rec: f.rs, gold: f.champ === f.M }); }
-    else if (k === 'speed') { SV.speed = SV.speed === 1 ? 2 : SV.speed === 2 ? 4 : 1; el.querySelectorAll('[data-act=speed]').forEach(b => b.textContent = t('Velocidade {n}×', { n: SV.speed })); }
     return;
   }
   const m = e.target.closest('.mt[data-g]'); if (m) { svOpen(+m.dataset.g); return; }
