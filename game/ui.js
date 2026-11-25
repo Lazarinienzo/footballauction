@@ -265,7 +265,7 @@ $('#lab-batch').onclick = () => labBatch(2000);
 // ----- lobby -----
 const CODE_CH = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const mkCode = () => Array.from({ length: 4 }, () => CODE_CH[rint(0, CODE_CH.length - 1)]).join('');
-const L = { code: mkCode(), emb: rint(0, EMB.length - 1), name: '', bots: [], uid: 0, seen: new Set(), log: [] };
+const L = { bench: false, code: mkCode(), emb: rint(0, EMB.length - 1), name: '', bots: [], uid: 0, seen: new Set(), log: [] };
 L.name = emN(L.emb); L.auto = true;
 const taken = () => new Set([L.emb, ...L.bots.map(b => b.emb)]);
 const freeEmb = () => { const t = taken(), f = EMB.map((_, i) => i).filter(i => !t.has(i)); return f[rint(0, f.length - 1)]; };
@@ -308,10 +308,23 @@ function paintLobby() {
   $('#lb-count').textContent = `${n}/${L.mp ? MP.lobby.max : MAX_BOTS + 1}`;
   const c1 = Math.ceil(n / 2), c2 = n - c1;
   $('#lb-go').textContent = n < MIN_TEAMS ? t('Faltam {n} pra começar', { n: MIN_TEAMS - n }) : t('Abrir o leilão com {n} times', { n });
-  $('#lb-note').textContent = n < MIN_TEAMS ? t('Mínimo de {n} times pra formar as 2 conferências.', { n: MIN_TEAMS }) : t('{s} vagas pra preencher. As conferências ({a} e {b} times) são sorteadas depois do leilão.', { s: TOTAL_SLOTS * n, a: c1, b: c2 });
+  $('#lb-note').textContent = n < MIN_TEAMS ? t('Mínimo de {n} times pra formar as 2 conferências.', { n: MIN_TEAMS }) : t('{s} vagas pra preencher. As conferências ({a} e {b} times) são sorteadas depois do leilão.', { s: (benchOn() ? BENCH_TOTAL : TOTAL_SLOTS) * n, a: c1, b: c2 });
   $('#lb-go').disabled = n < MIN_TEAMS;
+  paintBenchOpt();
   if (L.mp) mpPaintGo(n);
 }
+const benchOn = () => !!(L.mp ? MP.lobby && MP.lobby.bench : L.bench);
+function paintBenchOpt() {
+  const on = benchOn(), host = !L.mp || mpIsHost(), b = $('#lb-bench');
+  b.classList.toggle('on', on); b.disabled = !host; b.setAttribute('aria-pressed', on);
+  $('#lb-bench-s').textContent = on ? t('20 jogadores por time: 16 titulares e 4 reservas, com formações.') : t('16 titulares por time, formação padrão.');
+  const r = document.querySelector('#lobby .rules div:nth-child(2)');
+  if (r) { r.querySelector('b').textContent = on ? BENCH_TOTAL : TOTAL_SLOTS; r.querySelector('span').textContent = on ? t('jogadores (16 + 4 reservas)') : t('titulares'); }
+}
+$('#lb-bench').onclick = () => {
+  if (L.mp) { if (mpIsHost()) mpSend({ t: 'bench', on: !benchOn() }); return; }
+  L.bench = !L.bench; paintLobby();
+};
 $('#go-lobby').onclick = $('#go-solo').onclick = () => { L.mp = false; openLobby(!L.log.length || L.wasMp); L.wasMp = false; };
 $('#r-home').onclick = () => { svStop(); SV.el = null; show('setup'); };
 $('#lb-back').onclick = () => show('setup');
@@ -339,8 +352,9 @@ $('#lb-go').onclick = () => {
   G.mp = false; G.meId = 0; G.A = null;
   const flat = {}; POS_ORDER.forEach(p => flat[p] = 1);
   G.name = (L.name.trim() || emN(L.emb)).slice(0, 44);
-  G.teams = [{ id: 0, name: G.name, emb: L.emb, human: true, budget: BUDGET, roster: [], persona: { aggr: 1, pos: flat } }];
-  L.bots.forEach((b, i) => { const t = newBot(i + 1, b.name); t.emb = b.emb; G.teams.push(t); });
+  G.bench = L.bench;
+  G.teams = [cfgTeam({ id: 0, name: G.name, emb: L.emb, human: true, budget: BUDGET, roster: [], persona: { aggr: 1, pos: flat } }, L.bench)];
+  L.bots.forEach((b, i) => { const t = newBot(i + 1, b.name, L.bench); t.emb = b.emb; G.teams.push(t); });
   G.A = new Auction(G.teams, DB);
   Object.assign(G, { shownI: -2, shownV: -1, fracShown: 1, phaseSeen: '', leaderKey: '', lastPrice: 0, flashedV: -1, btnKey: '', feedKey: '', season: null });
   $('#season').hidden = true; $('#season').innerHTML = '';
@@ -413,14 +427,20 @@ function frame(now) {
   if (G.A.done) { cancelAnimationFrame(G.raf); showResults(); return; }
   paintAuction(false, dt);
 }
-function lineupRows(roster, order) {
-  const out = [];
+// titulares nas vagas da formação (na ordem das vagas de cada posição); sem order, o melhor OVR de cada posição joga
+function lineupRows(roster, order, form) {
+  const fs = formSlots(form), ord = order ? normOrder(roster, order, form) : null, out = [];
   for (const pos of POS_ORDER) {
-    const have = order && order[pos] ? order[pos].map(id => roster.find(p => p.id === id && p.pos === pos) || null) : roster.filter(p => p.pos === pos).sort((a, b) => b.ovr - a.ovr);
-    for (let i = 0; i < SLOTS[pos]; i++) out.push({ pos, p: have[i] || null });
+    const have = ord ? ord[pos].map(id => roster.find(p => p.id === id) || null) : roster.filter(p => p.pos === pos).sort((a, b) => b.ovr - a.ovr);
+    for (let i = 0; i < fs[pos]; i++) out.push({ pos, p: have[i] || null, i });
   }
   return out;
 }
+// reservas = quem está no elenco e não ocupa vaga de titular
+const benchOf = (roster, ord) => { const used = new Set(Object.values(ord || {}).flat()); return roster.filter(p => !used.has(p.id)).sort((a, b) => POS_ORDER.indexOf(a.pos) - POS_ORDER.indexOf(b.pos) || b.ovr - a.ovr); };
+// vagas de cada posição pro Mesa (todas as vagas do elenco, titulares e reservas)
+const chipRows = (roster, slots) => POS_ORDER.flatMap(pos => { const have = roster.filter(p => p.pos === pos).sort((a, b) => b.ovr - a.ovr); return Array.from({ length: slots[pos] }, (_, i) => ({ pos, p: have[i] || null })); });
+const FORM_LABEL = { off: { std: 'Padrão', w3: '3 WR', te2: '2 TE' }, def: { std: 'Padrão', cb3: '3 CB', lb3: '3 LB' } };
 function slotHTML(r, o) {
   o = o || {};
   const side = OFF_POS.includes(r.pos) ? 'off' : 'def';
@@ -433,7 +453,7 @@ function slotHTML(r, o) {
 // frase de impacto da venda (depende de quanto foi gasto)
 function impactLine(s) {
   const T = s.team, price = s.price, left = T.budget, before = left + price, frac = price / before, ovr = s.player.ovr, who = T.human ? t('Você') : tsh(T);
-  const open = TOTAL_SLOTS - T.roster.length, pick = a => a[rint(0, a.length - 1)];
+  const open = (T.total || TOTAL_SLOTS) - T.roster.length, pick = a => a[rint(0, a.length - 1)];
   if (price <= 2 && ovr >= 88) return t(pick(['Roubo à luz do dia! Levou quase de graça.', 'Pechincha do leilão. Ninguém acreditou.', 'O leiloeiro até estranhou o preço.']));
   if (price >= 35 || frac >= .5) return t(pick(['{who} jogou quase o cofre inteiro nessa cartada.', 'Valor de Super Bowl. Agora é rezar pelo resto do time.', 'Que loucura! Esse lance vai pesar no resto do leilão.', 'Ninguém gasta tanto sem acreditar. Aposta alta.']), { who });
   if (left <= 3 && open > 1 && R() < .85) return t(pick(['Cofre quase vazio. Agora é economia pura.', 'Dinheiro acabando e ainda tem vaga pra preencher.']));
@@ -532,7 +552,7 @@ function paintAuction(force, dt) {
   $('#pass').hidden = !(bidding && inRace && !A.passed.has(M) && A.leader !== M);
   let hint = '';
   if (bidding) {
-    if (!inRace) hint = M.roster.filter(x => x.pos === p.pos).length >= SLOTS[p.pos] ? t('Você já fechou {p}. Só assistindo.', { p: p.pos }) : t('Você não tem saldo pra essa vaga.');
+    if (!inRace) hint = M.roster.filter(x => x.pos === p.pos).length >= M.slots[p.pos] ? t('Você já fechou {p}. Só assistindo.', { p: p.pos }) : t('Você não tem saldo pra essa vaga.');
     else if (out) hint = t('Você saiu desse lance. Só aguardar o próximo jogador.');
     else if (A.leader === M) hint = t('Você está na frente. Se ninguém cobrir até o relógio zerar, o jogador é seu.');
     else hint = t('Seu teto aqui: {c}, guardando $1 por vaga que sobra.', { c: dollars(cap) });
@@ -559,18 +579,50 @@ const POSINFO = {
 const wfmt = x => nf(x.toFixed(2).replace(/0+$/, '').replace(/\.$/, ''));
 function fieldHTML(side, rows, o) {
   const by = {}; rows.forEach(r => (by[r.pos] = by[r.pos] || []).push(r));
-  const sp = SPOT[side], xs = sp.map(q => q[2]), x0 = Math.min(...xs), span = Math.max(...xs) - x0 + 1.2, rowsN = Math.max(...sp.map(q => q[3])) + 1;
+  const form = o.form || STD, sp = SPOT[side][form[side]], xs = Object.values(SPOT[side]).flat().map(q => q[2]), x0 = Math.min(...xs), span = Math.max(...xs) - x0 + 1.2, rowsN = 3;
   const cells = sp.map(([pos, i, x, y]) => {
     const r = by[pos][i], want = o.cur && !r.p && o.cur.pos === pos, isNew = o.newId != null && r.p && r.p.id === o.newId, lk = r.p && o.linked && o.linked.has(r.p.id);
     const logo = r.p ? badge(frIdx(r.p), 34) : '<span class="plus">+</span>';
     const bn = r.p && o.bw && o.bw[side] ? o.bw[side].get(r.p.id) || 0 : 0, w = WEIGHT[pos];
     const wt = bn > 0.004 ? `<em class="up" title="${t('Sinergia')} +${wfmt(bn)}x">▲${wfmt(w + bn)}x</em>` : w > 1 ? `<em>${wfmt(w)}x</em>` : '';
-    return `<div class="tk ${side} ${r.p ? '' : 'empty'} ${want ? 'want' : ''} ${isNew ? 'new' : ''} ${lk ? 'lk' : ''} ${o.sel && o.sel.pos === pos ? (o.sel.i === i ? 'sel' : 'tgt') : ''}" data-pos="${pos}" data-i="${i}" data-id="${r.p ? r.p.id : ''}" style="left:${(x - x0 + .6) / span * 100}%;top:calc(${y} * var(--rh));width:${100 / span}%${lk ? ';--tc:' + EMB[frIdx(r.p)][1] : ''}"><div class="r"><span class="c">${logo}</span><span class="ov num">${r.p ? r.p.ovr : ''}</span></div><small>${r.p ? esc(shortName(r.p.name)) : ''}</small><b>${pos}${wt}</b></div>`;
+    const sel = o.sel && o.sel.pos === pos ? (o.sel.bid == null && o.sel.i === i ? 'sel' : 'tgt') : '';
+    return `<div class="tk ${side} ${r.p ? '' : 'empty'} ${want ? 'want' : ''} ${isNew ? 'new' : ''} ${lk ? 'lk' : ''} ${sel}" data-pos="${pos}" data-i="${i}" data-id="${r.p ? r.p.id : ''}" style="left:${(x - x0 + .6) / span * 100}%;top:calc(${y} * var(--rh));width:${100 / span}%${lk ? ';--tc:' + EMB[frIdx(r.p)][1] : ''}"><div class="r"><span class="c">${logo}</span><span class="ov num">${r.p ? r.p.ovr : ''}</span></div><small>${r.p ? esc(shortName(r.p.name)) : ''}</small><b>${pos}${wt}</b></div>`;
   });
   const got = rows.filter(r => r.p).length;
   const sy = o.syn && o.syn[side] ? `<span class="sy">${t('Sinergia')} +${nf(o.syn[side].toFixed(1))}</span>` : '', up = o.up && o.up[side] ? `<span class="sy up">${t('Esse lote liga com seu time')} +${nf(o.up[side].toFixed(1))}</span>` : '';
-  return `<div class="fld"><div class="fh"><span>${t(side === 'off' ? 'ATAQUE' : 'DEFESA')} ${sy}</span>${up}<span class="num">${got}/8</span></div><div class="fg" style="--rows:${rowsN}">${cells.join('')}</div></div>`;
+  const fb = o.bench ? `<div class="fmb">${Object.keys(FORMS[side]).map(f => `<button type="button" class="${form[side] === f ? 'on' : ''}" data-side="${side}" data-f="${f}">${t(FORM_LABEL[side][f])}</button>`).join('')}</div>` : '';
+  return `<div class="fld"><div class="fh"><span>${t(side === 'off' ? 'ATAQUE' : 'DEFESA')} ${sy}</span>${up}<span class="num">${got}/8</span></div>${fb}<div class="fg" style="--rows:${rowsN}">${cells.join('')}</div></div>`;
 }
+// painel de reservas: uma vaga por reserva possível de cada posição (elenco máximo da posição menos os titulares da formação)
+function benchHTML(T, ord, o) {
+  const fs = formSlots(T.form), pl = benchOf(T.roster, ord), toks = [];
+  for (const pos of POS_ORDER) {
+    const cap = T.slots[pos] - fs[pos], have = pl.filter(p => p.pos === pos);
+    for (let k = 0; k < cap; k++) {
+      const p = have[k], want = o.cur && !p && o.cur.pos === pos, sel = o.sel && o.sel.pos === pos ? (p && o.sel.bid === p.id ? 'sel' : p ? 'tgt' : '') : '';
+      toks.push(`<div class="tk bn ${OFF_POS.includes(pos) ? 'off' : 'def'} ${p ? '' : 'empty'} ${want ? 'want' : ''} ${sel}" data-pos="${pos}" data-bid="${p ? p.id : ''}"><div class="r"><span class="c">${p ? badge(frIdx(p), 34) : '<span class="plus">+</span>'}</span><span class="ov num">${p ? p.ovr : ''}</span></div><small>${p ? esc(shortName(p.name)) : ''}</small><b>${pos}</b></div>`);
+    }
+  }
+  const n = pl.length;
+  return `<div class="fld bnc"><div class="fh"><span>${t('RESERVAS')}</span><span class="num">${n}/${toks.length}</span></div><div class="bg">${toks.join('')}</div></div>`;
+}
+// toque num titular ou reserva: seleciona; depois toque em outro da MESMA posição pra trocar (reserva entra no lugar do titular selecionado)
+function tapField(T, ctx, k) {
+  const pos = k.dataset.pos, ord = T.order, sel = ctx.sel;
+  if (k.classList.contains('bn')) {
+    const bid = k.dataset.bid ? +k.dataset.bid : null; if (bid == null) return;
+    if (sel && sel.pos === pos && sel.bid == null) { ord[pos][sel.i] = bid; ctx.sel = null; }
+    else ctx.sel = sel && sel.bid === bid ? null : { pos, bid };
+  } else {
+    const i = +k.dataset.i;
+    if (sel && sel.pos === pos) {
+      if (sel.bid != null) { ord[pos][i] = sel.bid; ctx.sel = null; }
+      else { if (sel.i !== i) { const a = ord[pos]; [a[sel.i], a[i]] = [a[i], a[sel.i]]; } ctx.sel = sel.i === i ? null : { pos, i }; }
+    } else ctx.sel = { pos, i };
+  }
+  T.order = normOrder(T.roster, ord, T.form);
+}
+function setForm(T, ctx, side, f) { T.form = { ...(T.form || STD), [side]: f }; T.order = normOrder(T.roster, T.order, T.form); ctx.sel = null; }
 // linhas de sinergia estilo FIFA: ligam os titulares do mesmo time da NFL, na cor do time
 function drawLinks(links, root) {
   root = root || '#fm';
@@ -587,90 +639,85 @@ function drawLinks(links, root) {
   });
   requestAnimationFrame(run);
 }
-// onde cada jogador do elenco joga em campo (M.order). Quem acabou de chegar entra na vaga selecionada (se livre) ou na primeira vaga livre.
+// onde cada jogador do elenco joga em campo (M.order) e em que formação (M.form). Quem acabou de chegar entra na vaga selecionada (se livre)
+// ou na primeira vaga livre; se não houver vaga de titular, vira reserva.
 function placeIn(ord, p, sel) {
-  const s = ord[p.pos], i = sel && sel.pos === p.pos && s[sel.i] == null ? sel.i : s.indexOf(null);
+  const s = ord[p.pos], i = sel && sel.pos === p.pos && sel.bid == null && s[sel.i] == null ? sel.i : s.indexOf(null);
   if (i >= 0) s[i] = p.id; return ord;
 }
-function ensureOrder(M) {
-  const old = M.order || {}, known = new Set(Object.values(old).flat().filter(x => x != null));
-  const ord = normOrder(M.roster.filter(p => known.has(p.id)), old);
-  M.roster.filter(p => !known.has(p.id)).forEach(p => { placeIn(ord, p, G.sel); if (G.sel && G.sel.pos === p.pos) G.sel = null; });
-  const key = JSON.stringify(ord);
-  if (M._ok !== key) { M._ok = key; M.order = ord; if (G.mp && M.human) mpSend({ t: 'ord', o: ord }); } else M.order = ord;
+function ensureOrder(M, ctx, send) {
+  M.form = validForm(M.form, M.bench);
+  const seen = M._ids, fresh = seen ? M.roster.filter(p => !seen.has(p.id)) : [];
+  const ord = normOrder(M.roster.filter(p => !fresh.includes(p)), M.order, M.form);
+  fresh.forEach(p => { placeIn(ord, p, ctx.sel); if (ctx.sel && ctx.sel.pos === p.pos && ctx.sel.bid == null) ctx.sel = null; });
+  M._ids = new Set(M.roster.map(p => p.id));
+  const key = JSON.stringify([ord, M.form]);
+  if (M._ok !== key) { M._ok = key; M.order = ord; if (send) send(M); } else M.order = ord;
   return ord;
+}
+const sendOrder = M => { if (G.mp && M.human) mpSend({ t: 'ord', o: M.order, f: M.form }); };
+// dados de sinergia e desenho do campo de um time (usado no leilão e no Sandbox)
+function fieldData(T, ord, ctx) {
+  const rows = lineupRows(T.roster, ord, T.form), L = lineup(T.roster, ord, T.form), I = { off: synInfo(L, 'off'), def: synInfo(L, 'def') }, links = { off: I.off.links, def: I.def.links };
+  const o = { sel: ctx.sel, form: T.form, bench: T.bench, linked: new Set(), syn: { off: I.off.pts, def: I.def.pts }, bw: { off: I.off.bw, def: I.def.bw } };
+  ['off', 'def'].forEach(sd => links[sd].forEach(l => { o.linked.add(l.a.id); o.linked.add(l.b.id); }));
+  return { rows, L, I, links, o };
 }
 function paintLineup() {
   const A = G.A, M = me();
   if (!M.roster.length) G.sel = null;
-  const ord = ensureOrder(M), rows = lineupRows(M.roster, ord);
+  const ord = ensureOrder(M, G, sendOrder), { rows, I, links, o } = fieldData(M, ord, G);
   const flash = A.sold && A.sold.team === M && G.flashedV !== A.version ? A.sold.player.id : null;
   if (flash != null) G.flashedV = A.version;
-  const o = { cur: A.phase === 'bidding' ? A.cur : null, newId: flash, sel: G.sel };
+  o.cur = A.phase === 'bidding' ? A.cur : null; o.newId = flash;
   const off = rows.filter(r => OFF_POS.includes(r.pos)), def = rows.filter(r => !OFF_POS.includes(r.pos));
-  const L = lineup(M.roster, ord), I = { off: synInfo(L, 'off'), def: synInfo(L, 'def') }, links = { off: I.off.links, def: I.def.links };
-  o.linked = new Set(); ['off', 'def'].forEach(sd => links[sd].forEach(l => { o.linked.add(l.a.id); o.linked.add(l.b.id); }));
-  o.syn = { off: I.off.pts, def: I.def.pts }; o.bw = { off: I.off.bw, def: I.def.bw };
-  if (o.cur && M.roster.length < TOTAL_SLOTS) {      // o lote em disputa ligaria com alguém do seu time? (quanto de sinergia ele traria)
+  if (o.cur && slotsLeft(M) > 0) {      // o lote em disputa ligaria com alguém do seu time? (quanto de sinergia ele traria)
     const sd = OFF_POS.includes(o.cur.pos) ? 'off' : 'def', o2 = JSON.parse(JSON.stringify(ord)); placeIn(o2, o.cur, G.sel);
-    const I2 = synInfo(lineup(M.roster.concat([o.cur]), o2), sd);
+    const I2 = synInfo(lineup(M.roster.concat([o.cur]), o2, M.form), sd);
     if (I2.links.some(l => l.a.id === o.cur.id || l.b.id === o.cur.id)) o.up = { [sd]: Math.max(0.1, I2.pts - I[sd].pts) };
   }
-  $('#fm').innerHTML = fieldHTML('off', off, o) + fieldHTML('def', def, o);
+  $('#fm').innerHTML = fieldHTML('off', off, o) + fieldHTML('def', def, o) + (M.bench ? benchHTML(M, ord, o) : '');
   drawLinks(links);
-  const sp = G.sel && (M.roster.find(p => p.id === ord[G.sel.pos][G.sel.i]));
-  $('#fm-act').textContent = G.sel ? (sp ? t('Toque em outra vaga de {p} pra trocar {n} de lugar.', { p: G.sel.pos, n: shortName(sp.name) }) : t('Vaga selecionada: o próximo {p} que você comprar entra aqui.', { p: G.sel.pos })) : t('Toque num jogador e depois em outra vaga da mesma posição pra mudar de lugar.');
-  $('#lst').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE')}</div>${off.map(r => slotHTML(r, o)).join('')}<div class="sub">${t('DEFESA')}</div>${def.map(r => slotHTML(r, o)).join('')}`;
+  const sp = G.sel && (G.sel.bid != null ? M.roster.find(p => p.id === G.sel.bid) : M.roster.find(p => p.id === ord[G.sel.pos][G.sel.i]));
+  $('#fm-act').textContent = G.sel ? (sp ? t('Toque em outro {p} pra trocar {n} de lugar.', { p: G.sel.pos, n: shortName(sp.name) }) : t('Vaga selecionada: o próximo {p} que você comprar entra aqui.', { p: G.sel.pos })) : t(M.bench ? 'Toque num jogador e depois em outro da mesma posição (titular ou reserva) pra trocar. Mude a formação nos botões.' : 'Toque num jogador e depois em outra vaga da mesma posição pra mudar de lugar.');
+  const bn = M.bench ? benchOf(M.roster, ord) : [];
+  $('#lst').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE')}</div>${off.map(r => slotHTML(r, o)).join('')}<div class="sub">${t('DEFESA')}</div>${def.map(r => slotHTML(r, o)).join('')}` + (M.bench ? `<div class="sub">${t('RESERVAS')}</div>${bn.length ? bn.map(p => slotHTML({ pos: p.pos, p }, o)).join('') : `<p class="note">${t('Nenhum reserva ainda.')}</p>`}` : '');
 }
 $('#fm').onclick = e => {
-  const k = e.target.closest('.tk'); if (!k || !G.A || G.A.done) return;
-  const M = me(), pos = k.dataset.pos, i = +k.dataset.i;
-  if (G.sel && G.sel.pos === pos) {
-    if (G.sel.i !== i) { const s = M.order[pos]; [s[G.sel.i], s[i]] = [s[i], s[G.sel.i]]; }       // troca (ou move pra vaga livre)
-    G.sel = G.sel.i === i ? null : { pos, i };
-  } else G.sel = { pos, i };
-  paintLineup();
-  if (G.mp && M.human) mpSend({ t: 'ord', o: M.order });
+  if (!G.A || G.A.done) return; const M = me();
+  const fb = e.target.closest('.fmb [data-f]');
+  if (fb) setForm(M, G, fb.dataset.side, fb.dataset.f);
+  else { const k = e.target.closest('.tk'); if (!k) return; tapField(M, G, k); }
+  paintLineup(); sendOrder(M);
 };
 
 // ---------- SANDBOX: monte o elenco sem leilão, sem dinheiro ----------
-const SB = { slots: {}, pos: 'QB', q: '', sel: null };
-POS_ORDER.forEach(p => SB.slots[p] = Array(SLOTS[p]).fill(null));
+const SB = cfgTeam({ roster: [], order: null, form: { ...STD }, human: true, pos: 'QB', q: '', sel: null }, true);
 const sbPool = () => DB.map((p, i) => p.id != null ? p : (p.id = i, p));
 const sbById = id => sbPool().find(p => p.id === id);
-const sbRoster = slots => POS_ORDER.flatMap(p => (slots || SB.slots)[p].filter(x => x != null).map(sbById));
-const sbCopy = () => { const c = {}; POS_ORDER.forEach(p => c[p] = SB.slots[p].slice()); return c; };
-// onde o jogador entra: na vaga selecionada (da posição dele), senão na primeira vaga livre, senão no lugar do mais fraco
-function sbPlace(slots, p) {
-  const s = slots[p.pos]; let i = SB.sel && SB.sel.pos === p.pos ? SB.sel.i : s.indexOf(null);
-  if (i < 0) i = s.reduce((m, id, k) => sbById(id).ovr < sbById(s[m]).ovr ? k : m, 0);
-  s[i] = p.id; return slots;
-}
-function sbPick(p) {
-  const s = SB.slots[p.pos], at = s.indexOf(p.id);
-  if (at >= 0) { s[at] = null; SB.sel = null; return; }
-  sbPlace(SB.slots, p); SB.sel = null;
+function sbRemove(T, id) {
+  T.roster = T.roster.filter(x => x.id !== id);
+  T.order = Object.fromEntries(POS_ORDER.map(ps => [ps, (T.order[ps] || []).map(x => x === id ? null : x)]));
+  if (T._ids) T._ids.delete(id);
 }
 function paintSandbox() {
-  const roster = sbRoster(), rows = lineupRows(roster, SB.slots), L = lineup(roster, SB.slots);
+  const T = SB, ord = ensureOrder(T, SB, null), { rows, L, I, links, o } = fieldData(T, ord, SB);
   const off = rows.filter(r => OFF_POS.includes(r.pos)), def = rows.filter(r => !OFF_POS.includes(r.pos));
-  const I = { off: synInfo(L, 'off'), def: synInfo(L, 'def') }, links = { off: I.off.links, def: I.def.links }, o = { sel: SB.sel, linked: new Set(), syn: { off: I.off.pts, def: I.def.pts }, bw: { off: I.off.bw, def: I.def.bw } };
-  ['off', 'def'].forEach(sd => links[sd].forEach(l => { o.linked.add(l.a.id); o.linked.add(l.b.id); }));
-  const full = roster.length === TOTAL_SLOTS, rt = ratings(L), f = x => nf(x.toFixed(1));
-  $('#sb-stats').innerHTML = `<div><b class="num">${full ? f(rt.all) : '–'}</b><span>OVR</span></div><div><b class="num">${roster.length ? f(rt.off) : '–'}</b><span>${t('ATAQUE')}</span></div><div><b class="num">${roster.length ? f(rt.def) : '–'}</b><span>${t('DEFESA')}</span></div><div class="sy"><b class="num">+${f(o.syn.off + o.syn.def)}</b><span>${t('Sinergia')}</span></div>`;
-  $('#sb-fm').innerHTML = fieldHTML('off', off, o) + fieldHTML('def', def, o);
+  const full = rows.every(r => r.p), rt = ratings(L), f = x => nf(x.toFixed(1)), n = T.roster.length;
+  $('#sb-stats').innerHTML = `<div><b class="num">${full ? f(rt.all) : '–'}</b><span>OVR</span></div><div><b class="num">${n ? f(rt.off) : '–'}</b><span>${t('ATAQUE')}</span></div><div><b class="num">${n ? f(rt.def) : '–'}</b><span>${t('DEFESA')}</span></div><div class="sy"><b class="num">+${f(o.syn.off + o.syn.def)}</b><span>${t('Sinergia')}</span></div>`;
+  $('#sb-fm').innerHTML = fieldHTML('off', off, o) + fieldHTML('def', def, o) + benchHTML(T, ord, o);
   drawLinks(links, '#sb-fm');
-  const sp = SB.sel && sbById(SB.slots[SB.sel.pos][SB.sel.i]);
-  $('#sb-act').innerHTML = sp ? `<span>${t('Toque em outra vaga de {p} pra trocar de lugar.', { p: SB.sel.pos })}</span><button type="button" class="mini" id="sb-rm">${t('Remover {n}', { n: esc(shortName(sp.name)) })}</button>` : `<span>${SB.sel ? t('Vaga selecionada: escolha um jogador na lista.') : t('Toque num jogador e depois em outra vaga da mesma posição pra mudar de lugar.')}</span>`;
-  $('#sb-tabs').innerHTML = POS_ORDER.map(p => `<button type="button" data-p="${p}" class="${SB.pos === p ? 'on' : ''}" role="tab">${p}<small>${SB.slots[p].filter(x => x != null).length}/${SLOTS[p]}</small></button>`).join('');
-  const q = SB.q.trim().toLowerCase(), side = OFF_POS.includes(SB.pos) ? 'off' : 'def';
+  const sid = SB.sel && (SB.sel.bid != null ? SB.sel.bid : ord[SB.sel.pos][SB.sel.i]), sp = sid != null ? T.roster.find(x => x.id === sid) : null;
+  $('#sb-act').innerHTML = sp ? `<span>${t('Toque em outro {p} pra trocar {n} de lugar.', { p: SB.sel.pos, n: esc(shortName(sp.name)) })}</span><button type="button" class="mini" id="sb-rm">${t('Remover {n}', { n: esc(shortName(sp.name)) })}</button>` : `<span>${SB.sel ? t('Vaga selecionada: escolha um jogador na lista.') : t('Toque num jogador e depois em outro da mesma posição (titular ou reserva) pra trocar. Mude a formação nos botões.')}</span>`;
+  $('#sb-tabs').innerHTML = POS_ORDER.map(p => `<button type="button" data-p="${p}" class="${SB.pos === p ? 'on' : ''}" role="tab">${p}<small>${T.roster.filter(x => x.pos === p).length}/${T.slots[p]}</small></button>`).join('');
+  const q = SB.q.trim().toLowerCase(), side = OFF_POS.includes(SB.pos) ? 'off' : 'def', have = new Set(T.roster.map(x => x.id));
   const list = sbPool().filter(p => p.pos === SB.pos && (!q || p.name.toLowerCase().includes(q) || frName(p).toLowerCase().includes(q) || p.tm.toLowerCase() === q)).sort((a, b) => b.ovr - a.ovr).slice(0, 60);
   const cur = I[side].pts;
   $('#sb-list').innerHTML = list.map(p => {
-    const inn = SB.slots[p.pos].includes(p.id); let g = '';
+    const inn = have.has(p.id); let g = '';
     if (!inn) {                           // quanto o lado ganha de sinergia se ele entrar (na vaga que seria usada)
-      const s2 = sbPlace(sbCopy(), p), d = synInfo(lineup(sbRoster(s2), s2), side).pts - cur;
-      if (d > 0.04) g = `<span class="g">✦ +${f(d)}</span>`;
+      const h = { roster: T.roster.slice(), order: JSON.parse(JSON.stringify(ord)), form: T.form, slots: T.slots, bench: true }; h.order = normOrder(h.roster, h.order, h.form);
+      if (h.roster.filter(x => x.pos === p.pos).length < T.slots[p.pos]) { h.roster.push(p); placeIn(h.order, p, SB.sel); const d = synInfo(lineup(h.roster, h.order, h.form), side).pts - cur; if (d > 0.04) g = `<span class="g">✦ +${f(d)}</span>`; }
     }
     return `<button type="button" class="sbr ${inn ? 'in' : ''}" data-id="${p.id}">${badge(frIdx(p), 32)}<span class="n"><b>${esc(p.name)}</b><small>${esc(frName(p))}</small></span>${g || '<span class="g"></span>'}<span class="o num">${inn ? '✓' : p.ovr}</span></button>`;
   }).join('') || `<p class="note">${t('Nenhum jogador encontrado.')}</p>`;
@@ -678,20 +725,36 @@ function paintSandbox() {
 function openSandbox() { show('sandbox'); paintSandbox(); }
 $('#go-sandbox').onclick = openSandbox;
 $('#sb-back').onclick = () => show('setup');
-$('#sb-clear').onclick = () => { POS_ORDER.forEach(p => SB.slots[p].fill(null)); SB.sel = null; paintSandbox(); };
+$('#sb-clear').onclick = () => { SB.roster = []; SB.order = null; SB._ids = null; SB._ok = null; SB.sel = null; paintSandbox(); };
 $('#sb-q').oninput = e => { SB.q = e.target.value; paintSandbox(); };
 $('#sb-tabs').onclick = e => { const b = e.target.closest('[data-p]'); if (!b) return; SB.pos = b.dataset.p; SB.sel = null; paintSandbox(); };
 $('#sb-fm').onclick = e => {
-  const k = e.target.closest('.tk'); if (!k) return;
-  const pos = k.dataset.pos, i = +k.dataset.i;
-  if (SB.sel && SB.sel.pos === pos) {
-    if (SB.sel.i !== i) { const s = SB.slots[pos]; [s[SB.sel.i], s[i]] = [s[i], s[SB.sel.i]]; }   // troca (ou move pra vaga livre)
-    SB.sel = SB.sel.i === i ? null : { pos, i };
-  } else { SB.sel = { pos, i }; SB.pos = pos; }
+  const fb = e.target.closest('.fmb [data-f]');
+  if (fb) setForm(SB, SB, fb.dataset.side, fb.dataset.f);
+  else { const k = e.target.closest('.tk'); if (!k) return; tapField(SB, SB, k); SB.pos = k.dataset.pos; }
   paintSandbox();
 };
-$('#sb-act').onclick = e => { if (e.target.closest('#sb-rm') && SB.sel) { SB.slots[SB.sel.pos][SB.sel.i] = null; SB.sel = null; paintSandbox(); } };
-$('#sb-list').onclick = e => { const b = e.target.closest('[data-id]'); if (!b) return; sbPick(sbById(+b.dataset.id)); paintSandbox(); };
+$('#sb-act').onclick = e => {
+  if (!e.target.closest('#sb-rm') || !SB.sel) return;
+  const id = SB.sel.bid != null ? SB.sel.bid : SB.order[SB.sel.pos][SB.sel.i]; if (id != null) sbRemove(SB, id); SB.sel = null; paintSandbox();
+};
+$('#sb-list').onclick = e => {
+  const b = e.target.closest('[data-id]'); if (!b) return; const p = sbById(+b.dataset.id);
+  if (SB.roster.some(x => x.id === p.id)) { sbRemove(SB, p.id); SB.sel = null; }
+  else {
+    ensureOrder(SB, SB, null);
+    const same = SB.roster.filter(x => x.pos === p.pos).length >= SB.slots[p.pos];
+    if (same) {                                  // posição cheia: ele toma o lugar do selecionado (ou do mais fraco)
+      const out = SB.sel && SB.sel.pos === p.pos ? (SB.sel.bid != null ? SB.sel.bid : SB.order[p.pos][SB.sel.i]) : null;
+      const gone = SB.roster.find(x => x.id === out) || SB.roster.filter(x => x.pos === p.pos).reduce((m, x) => x.ovr < m.ovr ? x : m);
+      const at = SB.order[p.pos].indexOf(gone.id); sbRemove(SB, gone.id);
+      SB.roster.push(p); SB._ids && SB._ids.add(p.id);
+      if (at >= 0) SB.order[p.pos][at] = p.id;   // entra na mesma vaga de titular que o saído ocupava
+    } else SB.roster.push(p);
+    SB.sel = null;
+  }
+  paintSandbox();
+};
 function openPosInfo() {
   const row = s => ([p, n, q, d]) => `<div class="pi"><span class="pos ${s}">${p}</span><div><b>${n}<em>${tpl('{n} vaga', '{n} vagas', q)} · ${nf(WEIGHT[p].toFixed(2).replace(/0$/, ''))}x</em></b><p>${t(d)}</p></div></div>`;
   $('#posinfo-b').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE · tem a bola')}</div>${POSINFO.off.map(row('off')).join('')}<div class="sub">${t('DEFESA · tenta tomar a bola')}</div>${POSINFO.def.map(row('def')).join('')}<p class="sh-n">${t('O OVR do ataque é a média dos 8 titulares do ataque, e o da defesa é a média dos 8 da defesa, com pesos. A base é 1,0x. Sobem pra 1,5x: WR, LB e CB. EDGE conta 2,0x e o QB conta 2,5x. Ou seja, um QB 90 pesa duas vezes e meia um jogador de linha 90.')}</p><p class="sh-n">${t('Sinergia: dois titulares do mesmo time da NFL, do mesmo lado e lado a lado no campo ganham uma linha na cor do time. Cada link soma +0,1x no peso dos dois (o RB de 1,0x ligado ao QB vira 1,1x, e o QB de 2,5x vira 2,6x), e esse peso extra vira pontos de OVR, até +4 por lado. Você escolhe em que vaga cada jogador joga: toque num jogador e depois em outra vaga da mesma posição pra trocar de lugar.')}</p>`;
@@ -710,11 +773,11 @@ function paintLists() {
     : `<div class="sale"><b>${esc(s.player.name)}</b> <em>${s.player.pos} · ${s.player.ovr} · ${esc(frName(s.player))}</em><br><em>${s.note === 'fica pro sorteio' ? t('você passou: o jogo completa seu time no fim') : t('ninguém quis, volta depois')}</em></div>`).join('') : '<p class="note">' + t('Nenhuma venda ainda.') + '</p>';
 }
 function tableHTML() {
-  return G.teams.map(t => `<div class="tm" data-t="${t.id}" role="button" tabindex="0"><div class="th">${badge(t.emb, 22)}<span class="tn">${esc(t.name)}${t.human ? ' (' + tt('você') + ')' : ''}</span></div><div class="tb2"><b class="num tb"></b><span class="tc num"></span></div><div class="tp"></div><span class="bb"><i></i></span></div>`).join('');
+  return G.teams.map(t => `<div class="tm" data-t="${t.id}" role="button" tabindex="0"><div class="th">${badge(t.emb, 22)}<span class="tn">${esc(t.name)}${t.human ? ' (' + tt('você') + ')' : ''}</span></div><div class="tb2"><b class="num tb"></b><span class="tc num"></span></div><div class="tp${t.bench ? ' b20' : ''}"></div><span class="bb"><i></i></span></div>`).join('');
 }
 // mini-campo: 4 colunas x 4 linhas (ataque em cima, defesa embaixo). Cheio = comprado, tracejado = vaga aberta
-function chipsHTML(roster, cur) {
-  return lineupRows(roster).map(r => `<span class="ch ${OFF_POS.includes(r.pos) ? 'off' : 'def'}${r.p ? '' : ' empty'}${!r.p && cur && cur.pos === r.pos ? ' want' : ''}">${r.pos}</span>`).join('');
+function chipsHTML(roster, cur, slots) {
+  return chipRows(roster, slots || SLOTS).map(r => `<span class="ch ${OFF_POS.includes(r.pos) ? 'off' : 'def'}${r.p ? '' : ' empty'}${!r.p && cur && cur.pos === r.pos ? ' want' : ''}">${r.pos}</span>`).join('');
 }
 function paintTable() {
   const A = G.A, cards = document.querySelectorAll('#table .tm'), cur = A.phase === 'bidding' ? A.cur : null;
@@ -724,10 +787,10 @@ function paintTable() {
     r.classList.toggle('out', A.phase === 'bidding' && A.passed.has(t));
     r.classList.toggle('me', t === me());
     tween(r.querySelector('.tb'), t.budget, dollars);
-    setText(r.querySelector('.tc'), `${t.roster.length}/${TOTAL_SLOTS}`);
+    setText(r.querySelector('.tc'), `${t.roster.length}/${t.total || TOTAL_SLOTS}`);
     r.querySelector('.bb i').style.width = Math.max(0, Math.min(100, t.budget / BUDGET * 100)) + '%';
     const key = t.roster.map(p => p.id).join(',') + '|' + (cur ? cur.pos : '');
-    if (r.dataset.k !== key) { r.dataset.k = key; r.querySelector('.tp').innerHTML = chipsHTML(t.roster, cur); }
+    if (r.dataset.k !== key) { r.dataset.k = key; r.querySelector('.tp').innerHTML = chipsHTML(t.roster, cur, t.slots); }
   });
   if (!$('#tview').hidden) tvPaint(false);
 }
@@ -735,12 +798,13 @@ function paintTable() {
 const TV = { id: -1, key: '' };
 function tvPaint(force) {
   const T = G.teams.find(x => x.id === TV.id); if (!T) return;
-  const key = T.id + ':' + T.roster.map(p => p.id).join(',') + ':' + T.budget + ':' + LANG;
+  const key = T.id + ':' + T.roster.map(p => p.id).join(',') + ':' + T.budget + ':' + LANG + ':' + JSON.stringify(T.form || 0) + JSON.stringify(T.order || 0);
   if (!force && key === TV.key) return; TV.key = key;
-  const rows = lineupRows(T.roster), off = rows.filter(r => OFF_POS.includes(r.pos)), def = rows.filter(r => !OFF_POS.includes(r.pos));
+  const ord = T.human || T.order ? T.order : null, form = T.form || STD, rows = lineupRows(T.roster, ord, form), off = rows.filter(r => OFF_POS.includes(r.pos)), def = rows.filter(r => !OFF_POS.includes(r.pos));
+  const bn = T.bench ? benchOf(T.roster, ord ? normOrder(T.roster, ord, form) : Object.fromEntries(POS_ORDER.map(ps => [ps, rows.filter(r => r.pos === ps).map(r => r.p && r.p.id)]))) : [];
   $('#tv-h').textContent = T.name + (T.human ? ' (' + tt('você') + ')' : '');
-  const st = tt('{n}/16 titulares · sobram {b}', { n: T.roster.length, b: dollars(T.budget) });
-  $('#tv-b').innerHTML = `<div class="tvh">${badge(T.emb, 40)}<small>${esc(st)}</small></div><div class="lu"><div><div class="sub" style="margin-top:0">${tt('ATAQUE')}</div>${off.map(r => slotHTML(r)).join('')}</div><div><div class="sub">${tt('DEFESA')}</div>${def.map(r => slotHTML(r)).join('')}</div></div>`;
+  const st = T.bench ? tt('{n}/20 jogadores · {f} · sobram {b}', { n: T.roster.length, f: T.form ? tt(FORM_LABEL.off[T.form.off]) + ' / ' + tt(FORM_LABEL.def[T.form.def]) : tt('Padrão'), b: dollars(T.budget) }) : tt('{n}/16 titulares · sobram {b}', { n: T.roster.length, b: dollars(T.budget) });
+  $('#tv-b').innerHTML = `<div class="tvh">${badge(T.emb, 40)}<small>${esc(st)}</small></div><div class="lu"><div><div class="sub" style="margin-top:0">${tt('ATAQUE')}</div>${off.map(r => slotHTML(r)).join('')}</div><div><div class="sub">${tt('DEFESA')}</div>${def.map(r => slotHTML(r)).join('')}</div></div>` + (T.bench ? `<div class="sub">${tt('RESERVAS')}</div>${bn.length ? bn.map(p => slotHTML({ pos: p.pos, p })).join('') : `<p class="note">${tt('Nenhum reserva ainda.')}</p>`}` : '');
 }
 function tvOpen(id) { TV.id = id; TV.key = ''; tvPaint(true); $('#tview').hidden = false; $('#tv-b').scrollTop = 0; }
 $('#table').addEventListener('click', e => { const r = e.target.closest('.tm[data-t]'); if (r) tvOpen(+r.dataset.t); });
@@ -779,8 +843,8 @@ document.addEventListener('keydown', e => {
 
 // ----- resultados -----
 function teamLineupHTML(t) {
-  const rows = lineupRows(t.roster, t.order), off = rows.filter(r => OFF_POS.includes(r.pos)), def = rows.filter(r => !OFF_POS.includes(r.pos));
-  return `<div class="lu"><div><div class="sub" style="margin-top:0">${tt('ATAQUE')} · ${t.rt.off.toFixed(1)}</div>${off.map((r, i) => slotHTML(r, { i })).join('')}</div><div><div class="sub">${tt('DEFESA')} · ${t.rt.def.toFixed(1)}</div>${def.map((r, i) => slotHTML(r, { i: i + off.length })).join('')}</div></div>`;
+  const rows = lineupRows(t.roster, t.order, t.form), off = rows.filter(r => OFF_POS.includes(r.pos)), def = rows.filter(r => !OFF_POS.includes(r.pos));
+  return `<div class="lu"><div><div class="sub" style="margin-top:0">${tt('ATAQUE')} · ${t.rt.off.toFixed(1)}</div>${off.map((r, i) => slotHTML(r, { i })).join('')}</div><div><div class="sub">${tt('DEFESA')} · ${t.rt.def.toFixed(1)}</div>${def.map((r, i) => slotHTML(r, { i: i + off.length })).join('')}</div></div>` + (t.bench && t.order ? (bn => bn.length ? `<div class="sub">${tt('RESERVAS')}</div><div class="lu"><div>${bn.map(p => slotHTML({ pos: p.pos, p })).join('')}</div></div>` : '')(benchOf(t.roster, normOrder(t.roster, t.order, t.form))) : '') + (t.bench && t.form && (t.form.off !== 'std' || t.form.def !== 'std') ? `<p class="note" style="margin-top:8px">${tt('Formação')}: ${tt(FORM_LABEL.off[t.form.off])} / ${tt(FORM_LABEL.def[t.form.def])}</p>` : '');
 }
 function showResults() {
   G.teams.forEach(finishTeam);
@@ -1002,11 +1066,11 @@ function narrateGame(g) {
     const pool = bank[pn], fresh = pool.map((_, i) => i).filter(i => !used.has(p.result + pn + i)), ni = pick(fresh.length ? fresh : pool.map((_, i) => i), 0); used.add(p.result + pn + ni);
     const s = pool[ni];
     const lo = O.lineup, ld = D.lineup, city = EMB_CITY[O.emb] || O.name.split(' ').slice(0, -1).join(' ') || O.name, same = EMB_CITY[O.emb] === EMB_CITY[D.emb];
-    const cast = { q: lo.QB, r: lo.RB, w: wpick(lo.WR), e: lo.TE, t: lo.OL[0], g: lo.OL[1], c: lo.OL[2], ed: wpick(ld.EDGE), dt: wpick(ld.DT), lb: wpick(ld.LB), cb: wpick(ld.CB) };
+    const cast = { q: lo.QB, r: lo.RB, w: wpick(lo.WR), e: lo.TE || wpick(lo.WR), t: lo.OL[0], g: lo.OL[1], c: lo.OL[2], ed: wpick(ld.EDGE), dt: wpick(ld.DT), lb: wpick(ld.LB), cb: wpick(ld.CB) };
     const byPos = { EDGE: cast.ed, DT: cast.dt, LB: cast.lb, CB: cast.cb }, a = { res: p.result, o: O.id, d: D.id };
     if (p.result === 'TD') {
       const role = tdRole(s);
-      const sc = role === 'W' ? cast.w : role === 'E' ? lo.TE : role === 'Q' ? lo.QB : role === 'P' ? wpick(lo.WR.concat([lo.TE])) : lo.RB;
+      const sc = role === 'W' ? cast.w : role === 'E' ? cast.e : role === 'Q' ? lo.QB : role === 'P' ? wpick(lo.WR.concat(lo.TE ? [lo.TE] : [])) : lo.RB;
       a.sc = pSlim(sc, O.id); if (role !== 'R' && role !== 'Q') a.qb = pSlim(lo.QB, O.id);
     } else if (p.result === 'INT' || p.result === 'FUM' || p.result === 'SACK' || p.result === 'DOWNS') {
       const role = defRole(s) || (p.result === 'INT' ? 'CB' : p.result === 'SACK' ? 'EDGE' : 'LB');

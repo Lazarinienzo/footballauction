@@ -283,6 +283,18 @@ button.seat.dash:active{background:var(--panel)}
 .feed .fl{padding:11px 0;border-bottom:1px solid var(--line);color:var(--mute);font-size:15px}
 .feed .fl:last-child{border-bottom:0}
 .feed .fl.new{color:var(--chalk);animation:slideL .4s ease both}
+.bopt{display:flex;align-items:center;gap:12px;width:100%;margin-top:14px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:16px;color:inherit;text-align:left;cursor:pointer;font:inherit}
+.bopt:disabled{cursor:default;opacity:.75}
+.bopt .sw{flex:none;width:42px;height:24px;border-radius:99px;background:var(--line);position:relative;transition:.2s}
+.bopt .sw i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s}
+.bopt.on .sw{background:var(--flag)}.bopt.on .sw i{left:21px}
+.bopt .bt b{display:block;font-size:15px}.bopt .bt small{display:block;color:var(--mute);font-size:12px;margin-top:2px}
+.fmb{display:flex;gap:6px;margin:2px 0 8px;flex-wrap:wrap}
+.fmb button{border:1px solid var(--line);background:var(--panel);color:var(--mute);border-radius:99px;padding:5px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.fmb button.on{background:var(--flag);border-color:var(--flag);color:#10151f}
+.fld.bnc .bg{display:grid;grid-template-columns:repeat(5,1fr);gap:6px 4px;padding:6px 2px 10px}
+.fld.bnc .tk{position:relative;transform:none;left:auto;top:auto;width:auto}
+.fld .tk.bn.empty{opacity:.55}
 .rules{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .rules div{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 10px;text-align:center}
 .rules b{display:block;font-family:var(--display);font-weight:800;font-size:24px;letter-spacing:-.04em;color:var(--hi)}
@@ -700,6 +712,7 @@ html,body{overflow-x:hidden}
 .tm .tc{font-size:12px;color:var(--mute)}
 .tm .tp{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
 .tm .tp .ch:nth-child(8){margin-bottom:5px}
+.tm .tp.b20{grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}.tm .tp.b20 .ch{font-size:8px;letter-spacing:-.3px}.tm .tp.b20 .ch:nth-child(8){margin-bottom:0}.tm .tp.b20 .ch:nth-child(n+6):nth-child(-n+10){margin-bottom:5px}
 .tm .ch{display:block;text-align:center;font-style:normal;font-size:9.5px;font-weight:800;letter-spacing:0;white-space:nowrap;overflow:hidden;line-height:1;padding:6px 0;border-radius:7px;border:1.5px solid transparent}
 .tm .ch.off{background:rgba(77,141,255,.24);color:var(--posoff)}
 .tm .ch.def{background:rgba(255,128,112,.22);color:var(--posdef)}
@@ -929,7 +942,9 @@ html,body{overflow-x:hidden}
     <div><b>6</b><span>posses por jogo</span></div>
   </div>
 
-  <button class="btn full" id="lb-go" style="margin-top:28px">Abrir o leilão</button>
+  <button type="button" class="bopt" id="lb-bench" aria-pressed="false"><span class="sw"><i></i></span><span class="bt"><b>Reservas e formações</b><small id="lb-bench-s"></small></span></button>
+
+  <button class="btn full" id="lb-go" style="margin-top:16px">Abrir o leilão</button>
   <p class="note" id="lb-note" style="margin-top:12px;text-align:center"></p>
   </div>
   </div>

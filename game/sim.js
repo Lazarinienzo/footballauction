@@ -3,6 +3,17 @@ const SLOTS = { QB: 1, RB: 1, WR: 2, TE: 1, OL: 3, EDGE: 2, DT: 2, LB: 2, CB: 2 
 const POS_ORDER = ['QB', 'RB', 'WR', 'TE', 'OL', 'EDGE', 'DT', 'LB', 'CB'];
 const OFF_POS = ['QB', 'RB', 'WR', 'TE', 'OL'];
 const TOTAL_SLOTS = 16, BUDGET = 200;
+// Modo com reservas: 20 jogadores. O elenco tem o máximo de cada posição entre todas as formações; quem não está entre os 16 titulares fica no banco.
+const BENCH_SLOTS = { QB: 1, RB: 1, WR: 3, TE: 2, OL: 3, EDGE: 2, DT: 2, LB: 3, CB: 3 }, BENCH_TOTAL = 20;
+// Formações (só no modo com reservas): quantos titulares cada posição tem. Padrão = a do jogo clássico.
+const FORMS = {
+  off: { std: { WR: 2, TE: 1 }, w3: { WR: 3, TE: 0 }, te2: { WR: 1, TE: 2 } },
+  def: { std: { DT: 2, LB: 2, CB: 2 }, cb3: { DT: 2, LB: 1, CB: 3 }, lb3: { DT: 1, LB: 3, CB: 2 } }
+};
+const STD = { off: 'std', def: 'std' };
+const formSlots = f => ({ QB: 1, RB: 1, OL: 3, EDGE: 2, ...FORMS.off[(f || STD).off], ...FORMS.def[(f || STD).def] });
+// configura o time pro modo do leilão (cada time carrega suas vagas, então o servidor pode ter várias salas ao mesmo tempo)
+function cfgTeam(t, bench) { t.bench = !!bench; t.slots = bench ? BENCH_SLOTS : SLOTS; t.total = bench ? BENCH_TOTAL : TOTAL_SLOTS; if (!t.form) t.form = { ...STD }; return t; }
 const LOT_MS = 6000, BID_MS = 4000;   // tempo do lote; cada lance leva o relógio pra BID_MS
 let RNG = Math.random;                         // gerador trocável: com semente, todos os clientes sorteiam a mesma temporada
 const R = () => RNG();
@@ -17,36 +28,47 @@ const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { c
 const shortName = n => { const t = n.replace(/\s+(Jr\.?|Sr\.?|II|III|IV)$/i, '').split(' '); return t[t.length - 1]; };
 
 // ---------- escalação e OVR de ataque / defesa ----------
-// order (opcional): { WR: [id, id], OL: [id, id, id], ... } = em que vaga do campo cada titular joga (Sandbox). Sem order, o melhor OVR ocupa a primeira vaga.
-function lineup(roster, order) {
-  const by = p => roster.filter(x => x.pos === p).sort((a, b) => b.ovr - a.ovr);
-  const at = p => order && Array.isArray(order[p]) ? order[p].map(id => roster.find(x => x.id === id && x.pos === p)) : by(p);
-  return { QB: at('QB')[0], RB: at('RB')[0], WR: at('WR'), TE: at('TE')[0], OL: at('OL'),
-           EDGE: at('EDGE'), DT: at('DT'), LB: at('LB'), CB: at('CB') };
+// order (opcional): { WR: [id, id], OL: [id, id, id], ... } = em que vaga do campo cada titular joga. Sem order, o melhor OVR ocupa a primeira vaga.
+// form (opcional) = formação { off, def }: define quantas vagas cada posição tem. L.S[pos] = jogadores nas vagas (undefined = vaga vazia).
+function lineup(roster, order, form) {
+  form = form || STD; const fs = formSlots(form), S = {};
+  for (const pos of POS_ORDER) {
+    const sorted = roster.filter(x => x.pos === pos).sort((a, b) => b.ovr - a.ovr);
+    S[pos] = Array.from({ length: fs[pos] }, (_, i) => order && Array.isArray(order[pos]) ? roster.find(x => x.id === order[pos][i] && x.pos === pos) : sorted[i]);
+  }
+  return { QB: S.QB[0], RB: S.RB[0], WR: S.WR, TE: S.TE[0], OL: S.OL, EDGE: S.EDGE, DT: S.DT, LB: S.LB, CB: S.CB, S, form };
 }
 // Peso de cada posição no OVR do time. A base é 1,0x; a média é sempre dividida pela soma dos pesos, então a escala do OVR não muda.
 const WEIGHT = { QB: 2.5, RB: 1.0, WR: 1.5, TE: 1.0, OL: 1.0, EDGE: 2.0, DT: 1.0, LB: 1.5, CB: 1.5 };   // base 1,0x; degraus 1,5x e 2,0x; o QB vale 2,5x
 // Posições no campo (x, y em "casas"): o desenho da tela e as sinergias usam as MESMAS coordenadas.
 // [posição, índice (0 = melhor OVR da posição), x, y]
 const SPOT = {
-  off: [['OL', 0, 1.5, 0], ['OL', 1, 2.5, 0], ['OL', 2, 3.5, 0], ['TE', 0, 4.5, 0], ['WR', 0, 1, 1], ['QB', 0, 2.5, 1], ['WR', 1, 4, 1], ['RB', 0, 2.5, 2]],
-  def: [['CB', 0, 1, 0], ['CB', 1, 4, 0], ['LB', 0, 2, 1], ['LB', 1, 3, 1], ['EDGE', 0, 1, 2], ['DT', 0, 2, 2], ['DT', 1, 3, 2], ['EDGE', 1, 4, 2]]
+  off: {
+    std: [['OL', 0, 1.5, 0], ['OL', 1, 2.5, 0], ['OL', 2, 3.5, 0], ['TE', 0, 4.5, 0], ['WR', 0, 1, 1], ['QB', 0, 2.5, 1], ['WR', 1, 4, 1], ['RB', 0, 2.5, 2]],
+    w3: [['OL', 0, 1.5, 0], ['OL', 1, 2.5, 0], ['OL', 2, 3.5, 0], ['WR', 2, 4.5, 0], ['WR', 0, 1, 1], ['QB', 0, 2.5, 1], ['WR', 1, 4, 1], ['RB', 0, 2.5, 2]],
+    te2: [['TE', 1, 0.5, 0], ['OL', 0, 1.5, 0], ['OL', 1, 2.5, 0], ['OL', 2, 3.5, 0], ['TE', 0, 4.5, 0], ['WR', 0, 1, 1], ['QB', 0, 2.5, 1], ['RB', 0, 2.5, 2]]
+  },
+  def: {
+    std: [['CB', 0, 1, 0], ['CB', 1, 4, 0], ['LB', 0, 2, 1], ['LB', 1, 3, 1], ['EDGE', 0, 1, 2], ['DT', 0, 2, 2], ['DT', 1, 3, 2], ['EDGE', 1, 4, 2]],
+    cb3: [['CB', 0, 1, 0], ['CB', 2, 2.5, 0], ['CB', 1, 4, 0], ['LB', 0, 2.5, 1], ['EDGE', 0, 1, 2], ['DT', 0, 2, 2], ['DT', 1, 3, 2], ['EDGE', 1, 4, 2]],
+    lb3: [['CB', 0, 1, 0], ['CB', 1, 4, 0], ['LB', 0, 1.5, 1], ['LB', 1, 2.5, 1], ['LB', 2, 3.5, 1], ['EDGE', 0, 1, 2], ['DT', 0, 2.5, 2], ['EDGE', 1, 4, 2]]
+  }
 };
 const SYN_DIST = 1.6;   // só jogadores vizinhos no campo se conectam
 // Titulares de cada lado, com o peso e o lugar da posição.
 function sideStarters(L, side) {
-  return SPOT[side].map(([pos, i, x, y]) => ({ pos, i, x, y, p: Array.isArray(L[pos]) ? L[pos][i] : L[pos], w: WEIGHT[pos] }));
+  return SPOT[side][(L.form || STD)[side]].map(([pos, i, x, y]) => ({ pos, i, x, y, p: L.S[pos][i], w: WEIGHT[pos] }));
 }
 // SINERGIA: dois titulares do MESMO lado, do mesmo time da NFL e VIZINHOS no campo formam um link.
 // Cada link soma +SYN_W no PESO dos dois jogadores (RB 1,0x ligado ao QB vira 1,1x; o QB vai de 2,5x a 2,6x), e o peso extra
 // conta inteiro no OVR do lado (a média continua dividida pelo peso base, então é bônus de verdade). Teto de SYN_CAP pontos por lado.
 const SYN_W = 0.1, SYN_CAP = 4;
-const SIDE_W = { off: SPOT.off.reduce((n, q) => n + WEIGHT[q[0]], 0), def: SPOT.def.reduce((n, q) => n + WEIGHT[q[0]], 0) };
+const sideW = (side, f) => SPOT[side][f].reduce((n, q) => n + WEIGHT[q[0]], 0);   // soma dos pesos da formação do lado
 function synLinks(L, side) {
   const xs = sideStarters(L, side).filter(x => x.p && x.p.tm), out = [];
   for (let i = 0; i < xs.length; i++) for (let j = i + 1; j < xs.length; j++)
     if (xs[i].p.tm === xs[j].p.tm && Math.hypot(xs[i].x - xs[j].x, xs[i].y - xs[j].y) <= SYN_DIST)
-      out.push({ a: xs[i].p, b: xs[j].p, pa: xs[i].pos, pb: xs[j].pos, tm: xs[i].p.tm, pts: SYN_W * (xs[i].p.ovr + xs[j].p.ovr) / SIDE_W[side] });
+      out.push({ a: xs[i].p, b: xs[j].p, pa: xs[i].pos, pb: xs[j].pos, tm: xs[i].p.tm, pts: SYN_W * (xs[i].p.ovr + xs[j].p.ovr) / sideW(side, (L.form || STD)[side]) });
   return out;
 }
 // links, peso extra de cada jogador (id -> +x, já com o teto aplicado) e pontos de OVR que a sinergia dá ao lado
@@ -66,11 +88,12 @@ function ratings(L) {
 }
 
 // ---------- arranjo no campo: em que vaga cada titular joga ----------
-// Completa e valida um arranjo { pos: [id|null, ...] }: ignora ids que não estão no elenco, e põe quem faltar na primeira vaga livre (melhor OVR primeiro).
-function normOrder(roster, order) {
-  const out = {};
+// Completa e valida um arranjo { pos: [id|null, ...] } pra formação dada: ignora ids que não estão no elenco, corta o que passa das vagas
+// (vai pro banco) e põe nas vagas livres o melhor OVR que estiver no banco. Quem não está nas vagas é reserva.
+function normOrder(roster, order, form) {
+  const out = {}, fs = formSlots(form);
   for (const pos of POS_ORDER) {
-    const have = roster.filter(p => p.pos === pos), ids = new Set(have.map(p => p.id)), slots = Array(SLOTS[pos]).fill(null);
+    const have = roster.filter(p => p.pos === pos), ids = new Set(have.map(p => p.id)), slots = Array(fs[pos]).fill(null);
     (order && Array.isArray(order[pos]) ? order[pos] : []).forEach((id, i) => { if (i < slots.length && id != null && ids.has(id) && !slots.includes(id)) slots[i] = id; });
     const rest = have.filter(p => !slots.includes(p.id)).sort((a, b) => b.ovr - a.ovr);
     for (let i = 0; i < slots.length && rest.length; i++) if (slots[i] == null) slots[i] = rest.shift().id;
@@ -78,20 +101,25 @@ function normOrder(roster, order) {
   }
   return out;
 }
-const perms = a => a.length < 2 ? [a] : a.flatMap((x, i) => perms(a.filter((_, j) => j !== i)).map(r => [x, ...r]));
-// arranjo com mais sinergia (usado pelos bots e por quem não mexeu no campo); empate fica com o melhor OVR na primeira vaga
-function autoOrder(roster) {
-  let best = normOrder(roster, null);
+const validForm = (f, bench) => { const o = {}; for (const sd of ['off', 'def']) o[sd] = bench && f && FORMS[sd][f[sd]] ? f[sd] : 'std'; return o; };
+const kperms = (a, k) => k <= 0 ? [[]] : a.length === 0 ? [Array(k).fill(null)] : a.flatMap((x, i) => kperms(a.filter((_, j) => j !== i), k - 1).map(r => [x, ...r]));
+// melhor plano (formação + quem joga onde) pra um elenco: maximiza o OVR de cada lado (média ponderada + sinergia). Usado pelos bots.
+function autoPlan(roster, bench) {
+  const form = { ...STD }; let order = normOrder(roster, null, form);
   for (const side of ['off', 'def']) {
-    const poss = [...new Set(SPOT[side].map(q => q[0]))].filter(pos => SLOTS[pos] > 1);
-    let top = -1, pick = null;
-    const go = (k, cur) => {
-      if (k === poss.length) { const o = { ...best, ...cur }, v = synInfo(lineup(roster, o), side).pts; if (v > top + 1e-9) { top = v; pick = o; } return; }
-      for (const pm of perms(best[poss[k]])) go(k + 1, { ...cur, [poss[k]]: pm });
-    };
-    go(0, {}); best = pick;
+    let best = null;
+    for (const f of bench ? Object.keys(FORMS[side]) : ['std']) {
+      const fm = { ...form, [side]: f }, base = normOrder(roster, order, fm), fs = formSlots(fm);
+      const poss = [...new Set(SPOT[side][f].map(q => q[0]))], pools = poss.map(pos => kperms(roster.filter(x => x.pos === pos).map(x => x.id), fs[pos]));
+      const go = (k, cur) => {
+        if (k === poss.length) { const o = { ...base, ...cur }, v = ratings(lineup(roster, o, fm))[side]; if (!best || v > best.v + 1e-9) best = { v, f, o }; return; }
+        for (const pm of pools[k]) go(k + 1, { ...cur, [poss[k]]: pm });
+      };
+      go(0, {});
+    }
+    form[side] = best.f; order = normOrder(roster, best.o, form);
   }
-  return best;
+  return { form, order };
 }
 
 // ---------- partida: 6 posses por time ----------
@@ -150,33 +178,34 @@ function simGame(tA, tB, opts) {
 
 // ---------- leilão ----------
 const POSW = { QB: 1.6, RB: 1.0, WR: 1.15, TE: 1.0, OL: 1.05, EDGE: 1.3, DT: 1.0, LB: 1.0, CB: 1.15 };
-const need = (t, pos) => SLOTS[pos] - t.roster.filter(p => p.pos === pos).length;
-const slotsLeft = t => TOTAL_SLOTS - t.roster.length;
+const need = (t, pos) => (t.slots || SLOTS)[pos] - t.roster.filter(p => p.pos === pos).length;
+const slotsLeft = t => (t.total || TOTAL_SLOTS) - t.roster.length;
 const maxBid = (t, p) => need(t, p.pos) <= 0 ? 0 : Math.max(0, t.budget - (slotsLeft(t) - 1));
 
-function maxTeams(db) {
-  const c = {}; db.forEach(p => c[p.pos] = (c[p.pos] || 0) + 1);
-  return Math.min(...POS_ORDER.map(pos => Math.floor((c[pos] || 0) / SLOTS[pos])));
+function maxTeams(db, slots) {
+  slots = slots || SLOTS; const c = {}; db.forEach(p => c[p.pos] = (c[p.pos] || 0) + 1);
+  return Math.min(...POS_ORDER.map(pos => Math.floor((c[pos] || 0) / slots[pos])));
 }
-function makePool(db, n, extra) {
+function makePool(db, n, extra, slots) {
+  slots = slots || SLOTS;
   extra = extra == null ? .5 : extra;           // sobra de jogadores por posição (50% a mais, mínimo +2)
   const pool = [];
   for (const pos of POS_ORDER) {
-    const all = db.filter(p => p.pos === pos), need = SLOTS[pos] * n;
+    const all = db.filter(p => p.pos === pos), need = slots[pos] * n;
     const take = Math.min(all.length, need + Math.max(2, Math.ceil(need * extra)));
     pool.push(...shuffle(all).slice(0, take));
   }
   return shuffle(pool).map((p, i) => ({ ...p, id: i, passes: 0, sold: false }));
 }
-function newBot(id, name) {
+function newBot(id, name, bench) {
   const pos = {}; POS_ORDER.forEach(p => pos[p] = .8 + R() * .45);
-  return { id, name, human: false, budget: BUDGET, roster: [], persona: { aggr: .85 + R() * .35, pos } };
+  return cfgTeam({ id, name, human: false, budget: BUDGET, roster: [], persona: { aggr: .85 + R() * .35, pos } }, bench);
 }
 
 class Auction {
   constructor(teams, db, extra) {
-    this.teams = teams; this.pool = makePool(db, teams.length, extra); this.i = -1; this.log = []; this.done = false; this.now = 0;
-    this.total = teams.length * TOTAL_SLOTS; this.soldCount = 0; this.version = 0;
+    this.teams = teams; this.pool = makePool(db, teams.length, extra, teams[0].slots); this.i = -1; this.log = []; this.done = false; this.now = 0;
+    this.total = teams.length * (teams[0].total || TOTAL_SLOTS); this.soldCount = 0; this.version = 0;
     this.stats = {};
     for (const pos of POS_ORDER) {
       const xs = this.pool.filter(p => p.pos === pos).map(p => p.ovr), m = avg(...xs);
@@ -200,7 +229,7 @@ class Auction {
     const s = this.stats[p.pos], z = (p.ovr - s.m) / s.sd, q = clamp(1 + .6 * z, .3, 2.8);
     // sobrou jogador na posição? bot sem pressa deixa os fracos passarem (até 2 vezes)
     if (this.supply(p.pos) > this.demand(p.pos) && p.passes < 2 && z < -.3 && R() < clamp((-z - .2) * .7, 0, .9)) return 0;
-    const urg = 1 + .6 * (1 - slotsLeft(t) / TOTAL_SLOTS);
+    const urg = 1 + .6 * (1 - slotsLeft(t) / (t.total || TOTAL_SLOTS));
     const syn = 1 + .07 * Math.min(3, t.roster.filter(x => x.tm && x.tm === p.tm && (OFF_POS.includes(x.pos) === OFF_POS.includes(p.pos))).length);   // bot paga um pouco mais por quem liga com o elenco
     let w = (t.budget / slotsLeft(t)) * q * POSW[p.pos] * t.persona.aggr * t.persona.pos[p.pos] * urg * syn * (.85 + R() * .3);
     if (slotsLeft(t) === 1) w = Math.max(w, t.budget * .7);
@@ -346,7 +375,11 @@ function drawConferences(teams) {
 }
 
 // ---------- temporada ----------
-function finishTeam(t) { t.order = t.order ? normOrder(t.roster, t.order) : autoOrder(t.roster); t.lineup = lineup(t.roster, t.order); t.rt = ratings(t.lineup); return t; }
+function finishTeam(t) {
+  if (t.order) { t.form = validForm(t.form, t.bench); t.order = normOrder(t.roster, t.order, t.form); }
+  else { const pl = autoPlan(t.roster, t.bench); t.form = pl.form; t.order = pl.order; }
+  t.lineup = lineup(t.roster, t.order, t.form); t.rt = ratings(t.lineup); return t;
+}
 const rankRow = (x, y) => (y.w + y.t / 2) - (x.w + x.t / 2) || (y.pf - y.pa) - (x.pf - x.pa) || y.pf - x.pf;
 // classificação de cada conferência a partir de uma lista de jogos já disputados
 function buildTables(confs, games) {
@@ -435,4 +468,4 @@ function simSeason(teams, confs) {
   return { confs, table, games, rounds, champion, finalists: champs.length > 1 ? [x, y] : [champs[0]] };
 }
 
-if (typeof module !== 'undefined') module.exports = { SPOT, SYN_W, SYN_CAP, synLinks, synInfo, normOrder, autoOrder, sideStarters, WEIGHT, SIM, POSSESSIONS, pTD, pFG, driveOdds, TAKE, SLOTS, POS_ORDER, OFF_POS, TOTAL_SLOTS, BUDGET, lineup, ratings, simGame, Auction, newBot, maxTeams, makePool, finishTeam, simSeason, drawConferences, buildTables, makeRounds, confName, qualifiers, MIN_TEAMS, MAX_CONF, need, slotsLeft, maxBid, duel, shortName, withSeed, mulberry32, rint, R };
+if (typeof module !== 'undefined') module.exports = { SPOT, FORMS, STD, BENCH_SLOTS, BENCH_TOTAL, formSlots, cfgTeam, validForm, SYN_W, SYN_CAP, synLinks, synInfo, normOrder, autoPlan, sideStarters, WEIGHT, SIM, POSSESSIONS, pTD, pFG, driveOdds, TAKE, SLOTS, POS_ORDER, OFF_POS, TOTAL_SLOTS, BUDGET, lineup, ratings, simGame, Auction, newBot, maxTeams, makePool, finishTeam, simSeason, drawConferences, buildTables, makeRounds, confName, qualifiers, MIN_TEAMS, MAX_CONF, need, slotsLeft, maxBid, duel, shortName, withSeed, mulberry32, rint, R };

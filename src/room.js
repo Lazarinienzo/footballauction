@@ -1,6 +1,6 @@
 // Uma sala do Touchdown Auction. O leilão roda aqui (servidor manda), os clientes só mostram e mandam lance/passar.
 import { DurableObject } from 'cloudflare:workers';
-import { DB, BUDGET, Auction, newBot, finishTeam, MIN_TEAMS, POS_ORDER, SLOTS } from './engine.js';
+import { DB, BUDGET, Auction, newBot, finishTeam, MIN_TEAMS, POS_ORDER, SLOTS, BENCH_SLOTS, validForm } from './engine.js';
 
 const MAX_SEATS = 8, EMB_N = 32, HOLD_MS = 3500, AWAY_BOT_MS = 12000, LOBBY_AWAY_MS = 25000;
 const clean = s => String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 44);
@@ -13,7 +13,7 @@ export class Room extends DurableObject {
     this.init();
   }
   init() {
-    Object.assign(this, { created: false, pub: false, pw: '', phase: 'lobby', seats: [], uid: 0, A: null, teams: null, seed: null, cseed: null, rd: 0, roundAt: 0, seasonOn: false, code: '', sentV: -1, lastSync: 0, hold: 0, key: '', active: Date.now(), emptyAt: 0, lastReg: 0 });
+    Object.assign(this, { bench: false, created: false, pub: false, pw: '', phase: 'lobby', seats: [], uid: 0, A: null, teams: null, seed: null, cseed: null, rd: 0, roundAt: 0, seasonOn: false, code: '', sentV: -1, lastSync: 0, hold: 0, key: '', active: Date.now(), emptyAt: 0, lastReg: 0 });
   }
 
   async fetch(req) {
@@ -115,6 +115,7 @@ export class Room extends DurableObject {
       case 'addBot': if (s.host && this.seats.length < MAX_SEATS) { const e = this.validEmb(m.emb) ? m.emb : this.freeEmb(); this.seats.push({ uid: ++this.uid, kind: 'bot', name: '', emb: e, auto: true, host: false }); } break;
       case 'rm': { const t = this.seatOf(m.uid); if (s.host && t && t !== s) { if (t.kind === 'human') this.kick(t); this.seats = this.seats.filter(x => x !== t); } break; }
       case 'ready': if (!s.host) s.ready = !!m.on; break;
+      case 'bench': if (s.host) { this.bench = !!m.on; this.seats.forEach(x => { if (!x.host) x.ready = false; }); } break;   // reservas e formações: só o anfitrião muda, e os outros confirmam de novo
       case 'start': if (s.host && this.seats.length >= MIN_TEAMS && this.allReady()) return this.start(); break;
       default: return;
     }
@@ -122,7 +123,7 @@ export class Room extends DurableObject {
   }
   allReady() { return this.seats.every(x => x.kind === 'bot' || x.host || x.ready); }
   kick(t) { if (t.c) { this.send(t.c, { t: 'err', code: 'kicked' }); t.c.seat = null; try { t.c.ws.close(1000, 'expulso'); } catch (e) { } this.conns.delete(t.c); t.c = null; } }
-  lobbyView() { return { t: 'lobby', code: this.code, pub: this.pub, lock: !!this.pw, max: MAX_SEATS, min: MIN_TEAMS, seats: this.seats.map(s => ({ uid: s.uid, kind: s.kind, name: s.name, emb: s.emb, auto: s.auto, host: !!s.host, ready: s.kind === 'bot' || !!s.host || !!s.ready, on: s.kind === 'bot' || !!s.c })) }; }
+  lobbyView() { return { t: 'lobby', bench: !!this.bench, code: this.code, pub: this.pub, lock: !!this.pw, max: MAX_SEATS, min: MIN_TEAMS, seats: this.seats.map(s => ({ uid: s.uid, kind: s.kind, name: s.name, emb: s.emb, auto: s.auto, host: !!s.host, ready: s.kind === 'bot' || !!s.host || !!s.ready, on: s.kind === 'bot' || !!s.c })) }; }
   pushLobby() { const v = this.lobbyView(); for (const c of this.conns) if (c.seat) this.send(c, { ...v, you: c.seat.uid }); }
   stat(k, n) { try { this.env.LOBBY.get(this.env.LOBBY.idFromName('main')).fetch('https://lobby/stat', { method: 'POST', body: JSON.stringify({ k, n }) }).catch(() => { }); } catch (e) { } }
   register() {
@@ -134,7 +135,7 @@ export class Room extends DurableObject {
 
   // ---------- leilão ----------
   start() {
-    this.teams = this.seats.map((s, i) => { const t = newBot(i, s.name || ('T' + i)); t.emb = s.emb; t.human = s.kind === 'human'; s.team = t; s.botted = false; if (t.human) s.awayAt = s.c ? 0 : Date.now(); return t; });
+    this.teams = this.seats.map((s, i) => { const t = newBot(i, s.name || ('T' + i), this.bench); t.emb = s.emb; t.human = s.kind === 'human'; s.team = t; s.botted = false; if (t.human) s.awayAt = s.c ? 0 : Date.now(); return t; });
     this.A = new Auction(this.teams, DB);
     this.stat('games'); this.stat('players', this.seats.filter(x => x.kind === 'human').length);
     this.phase = 'auction'; this.hold = Date.now() + HOLD_MS; this.sentV = -1; this.key = '';
@@ -145,7 +146,7 @@ export class Room extends DurableObject {
   }
   sendStart(c) {
     const A = this.A;
-    this.send(c, { t: 'start', you: c.seat.team ? c.seat.team.id : -1, host: !!c.seat.host, code: this.code,
+    this.send(c, { t: 'start', bench: !!this.bench, you: c.seat.team ? c.seat.team.id : -1, host: !!c.seat.host, code: this.code,
       teams: this.seats.map((s, i) => ({ id: i, emb: s.emb, name: s.name, auto: s.auto, human: s.kind === 'human', uid: s.uid })),
       pool: A.pool.map(p => [p.name, p.pos, p.ovr, p.tm]), total: A.total });
   }
@@ -156,7 +157,7 @@ export class Room extends DurableObject {
       bd: A.bids.map(b => [b.team.id, b.kind, b.price, b.inc || 0, b.first ? 1 : 0]),
       sd: A.sold ? [A.sold.player.id, A.sold.team ? A.sold.team.id : -1, A.sold.price, A.sold.note || ''] : null, hold: Math.max(0, this.hold - Date.now()) };
     if (full || A.version !== this.sentV) {
-      o.teams = this.teams.map(t => ({ b: t.budget, r: t.roster.map(p => [p.id, p.paid]), au: (t.auto || []).map(p => p.id), o: t.order || null }));
+      o.teams = this.teams.map(t => ({ b: t.budget, r: t.roster.map(p => [p.id, p.paid]), au: (t.auto || []).map(p => p.id), o: t.order || null, f: t.form || null }));
       o.lg = A.log.slice(0, 12).map(s => [s.player.id, s.team ? s.team.id : -1, s.price, s.note || '']);
     }
     return o;
@@ -173,8 +174,9 @@ export class Room extends DurableObject {
   // arranjo do campo (em que vaga cada titular joga): só humano, só durante o leilão; o servidor completa/valida na hora de usar (normOrder)
   order(s, m) {
     if (this.phase !== 'auction' || !s.team || !s.team.human || !m.o || typeof m.o !== 'object') return;
-    const o = {}; for (const pos of POS_ORDER) { const a = m.o[pos]; if (Array.isArray(a)) o[pos] = a.slice(0, SLOTS[pos]).map(x => Number.isInteger(x) ? x : null); }
-    s.team.order = o;
+    const lim = this.bench ? BENCH_SLOTS : SLOTS, o = {};
+    for (const pos of POS_ORDER) { const a = m.o[pos]; if (Array.isArray(a)) o[pos] = a.slice(0, lim[pos]).map(x => Number.isInteger(x) ? x : null); }
+    s.team.order = o; s.team.form = validForm(m.f, this.bench);                   // formação é pública: vai nos snapshots
   }
   step() {
     const now = Date.now(), A = this.A; let dt = Math.min(500, now - this.last); if (dt <= 0) dt = 100; this.last = now;
@@ -184,7 +186,7 @@ export class Room extends DurableObject {
     const k = this.stateKey();
     if (k !== this.key || now - this.lastSync >= 1000) { this.key = k; this.pushSnap(); }
   }
-  endView() { return { t: 'end', seed: this.cseed, teams: this.teams.map(t => ({ b: t.budget, r: t.roster.map(p => [p.id, p.paid]), au: (t.auto || []).map(p => p.id), o: t.order || null })) }; }
+  endView() { return { t: 'end', seed: this.cseed, teams: this.teams.map(t => ({ b: t.budget, r: t.roster.map(p => [p.id, p.paid]), au: (t.auto || []).map(p => p.id), o: t.order || null, f: t.form || null })) }; }
   sendEnd(c) { this.send(c, this.endView()); }
   sendResume(c) { if (this.seasonOn) this.send(c, { t: 'resume', seed: this.seed, rd: this.rd | 0, since: this.roundAt ? Date.now() - this.roundAt : 0 }); }
   finish() {

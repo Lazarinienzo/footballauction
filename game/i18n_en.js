@@ -391,3 +391,18 @@ Object.assign(I18N.en, {
   'Franquia': 'Franchise'
 });
 Object.assign(I18N.en, { 'Os 32 times da NFL. Você pode renomear o seu time.': 'All 32 NFL teams. You can rename your team.' });
+Object.assign(I18N.en, {
+  'Reservas e formações': 'Bench and formations',
+  '20 jogadores por time: 16 titulares e 4 reservas, com formações.': '20 players per team: 16 starters and 4 reserves, with formations.',
+  '16 titulares por time, formação padrão.': '16 starters per team, standard formation.',
+  'jogadores (16 + 4 reservas)': 'players (16 + 4 reserves)',
+  'RESERVAS': 'BENCH',
+  'Nenhum reserva ainda.': 'No reserves yet.',
+  'Padrão': 'Standard',
+  'Formação': 'Formation',
+  '{n}/20 jogadores · {f} · sobram {b}': '{n}/20 players · {f} · {b} left',
+  'Toque em outro {p} pra trocar {n} de lugar.': 'Tap another {p} to swap {n} with.',
+  'Toque num jogador e depois em outro da mesma posição (titular ou reserva) pra trocar. Mude a formação nos botões.': 'Tap a player, then another of the same position (starter or reserve) to swap. Change the formation with the buttons.',
+  'Toque num jogador e depois em outra vaga da mesma posição pra mudar de lugar.': 'Tap a player, then another spot of the same position to move them.',
+  'Sinergia: dois titulares do mesmo time da NFL, do mesmo lado e lado a lado no campo ganham uma linha na cor do time. Cada link soma +0,1x no peso dos dois (o RB de 1,0x ligado ao QB vira 1,1x, e o QB de 2,5x vira 2,6x), e esse peso extra vira pontos de OVR, até +4 por lado. Você escolhe em que vaga cada jogador joga: toque num jogador e depois em outra vaga da mesma posição pra trocar de lugar.': 'Synergy: two starters from the same NFL team, on the same side and next to each other on the field get a line in the team colour. Each link adds +0.1x to the weight of both (the 1.0x RB linked to the QB becomes 1.1x, and the 2.5x QB becomes 2.6x), and that extra weight turns into OVR points, up to +4 per side. You choose where each player lines up: tap a player, then another spot of the same position to swap.'
+});

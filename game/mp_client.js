@@ -148,7 +148,8 @@ function mpStartMsg(m) {
   G.meId = m.you;
   if (same) { G.teams.forEach(t => { t.human = t.id === m.you; }); G.shownI = -2; return; }          // reconexão: o espelho continua valendo
   G.mpCode = m.code; MP.phase = 'auction';
-  G.teams = m.teams.map(x => ({ id: x.id, name: x.auto || !x.name ? emN(x.emb) : x.name, emb: x.emb, human: x.id === m.you, hu: x.human, budget: BUDGET, roster: [], auto: [], persona: null }));
+  G.bench = !!m.bench;
+  G.teams = m.teams.map(x => cfgTeam({ id: x.id, name: x.auto || !x.name ? emN(x.emb) : x.name, emb: x.emb, human: x.id === m.you, hu: x.human, budget: BUDGET, roster: [], auto: [], persona: null }, G.bench));
   G.name = G.teams[m.you].name;
   const A = Object.create(Auction.prototype);
   Object.assign(A, { pool: mpPool(m.pool), teams: G.teams, i: -1, log: [], done: false, now: 0, total: m.total, soldCount: 0, version: 0, phase: 'bidding', price: 0, leader: null, sold: null, passed: new Set(), bids: [], nBids: 0, elig: [], humanIn: true, timeLeft: LOT_MS, timeMax: LOT_MS, hold: 0, mirror: true });
@@ -160,7 +161,7 @@ function mpStartMsg(m) {
 }
 function mpApplyTeams(list, fin) {
   const A = G.A;
-  list.forEach((x, k) => { const t = G.teams[k]; t.budget = x.b; t.roster = x.r.map(([id, paid]) => { const p = A.pool[id]; return { name: p.name, pos: p.pos, ovr: p.ovr, tm: p.tm, id, paid }; }); t.auto = x.au.map(id => A.pool[id]); if (x.o && (fin || !t.human || !t.order)) t.order = x.o; });
+  list.forEach((x, k) => { const t = G.teams[k]; t.budget = x.b; t.roster = x.r.map(([id, paid]) => { const p = A.pool[id]; return { name: p.name, pos: p.pos, ovr: p.ovr, tm: p.tm, id, paid }; }); t.auto = x.au.map(id => A.pool[id]); if (x.o && (fin || !t.human || !t.order)) t.order = x.o; if (x.f && (fin || !t.human || !t.form)) t.form = x.f; });
   A.pool.forEach(p => { p.sold = false; }); G.teams.forEach(t => t.roster.forEach(p => { A.pool[p.id].sold = true; }));
 }
 function mpSnap(s) {
