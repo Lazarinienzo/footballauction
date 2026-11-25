@@ -535,7 +535,7 @@ function simSeason(teams, confs) {
 // Quem começa alterna a cada rodada; quem joga depois vê o que o outro virou. Formação padrão pros dois.
 const DU_CFG = { QB: { n: 6, f: 3, k: 1 }, RB: { n: 6, f: 3, k: 1 }, WR: { n: 6, f: 3, k: 2 }, TE: { n: 6, f: 3, k: 1 }, OL: { n: 6, f: 4, k: 3 }, EDGE: { n: 6, f: 3, k: 2 }, DT: { n: 6, f: 3, k: 2 }, LB: { n: 6, f: 3, k: 2 }, CB: { n: 6, f: 3, k: 2 } };
 const DU_TURN_MS = 30000;
-const DU_EXTRA = { first: 7500, round: 10500, swap: 5500 };   // tempo extra no relógio do turno pras animações (sorteio, cartas entrando e saindo da mesa)
+const DU_EXTRA = { first: 7500, round: 12300, swap: 7300 };   // tempo extra no relógio do turno pras animações (sorteio, cartas entrando e saindo da mesa)
 class Duelo {
   constructor(db, o) {
     o = o || {}; this.db = db.map((p, i) => ({ ...p, id: i })); this.show = !!o.show;
@@ -545,6 +545,7 @@ class Duelo {
   get cfg() { return DU_CFG[this.pos]; }
   draw() {
     const pos = this.pos, c = DU_CFG[pos], all = this.db.filter(p => p.pos === pos);
+    this.prev = this.board ? this.board.map(b => b.slice()) : null;       // tabuleiros da rodada anterior (pra revelar o que ficou de fora)
     this.board = [0, 1].map(() => shuffle(all).slice(0, c.n).map(p => p.id));
     this.fl = [[], []]; this.sel = [[], []]; this.ok = [false, false]; this.cur = (this.r + this.first) % 2;
   }
@@ -570,8 +571,9 @@ class Duelo {
   }
   // o que o jogador p pode ver: só as cartas viradas (as fechadas nem saem do servidor); as escolhas do rival aparecem quando ele confirma
   view(p) {
-    const q = 1 - p, side = x => ({ cards: this.board[x].map((id, i) => this.fl[x].includes(i) ? id : null), fl: this.fl[x].slice(), sel: x === p || this.ok[x] ? this.sel[x].slice() : [], ok: this.ok[x] });
-    return { r: this.r, of: this.rounds.length, rounds: this.rounds, pos: this.done ? null : this.pos, cfg: this.done ? null : this.cfg, cur: this.cur, first: this.first, show: this.show, done: this.done, me: side(p), opp: side(q), picks: [this.picks[p].slice(), this.picks[q].slice()] };
+    const q = 1 - p, side = x => ({ cards: this.board[x].map((id, i) => this.ok[x] || this.fl[x].includes(i) ? id : null),   // quem já confirmou mostra o tabuleiro todo (o que ficou de fora)
+     fl: this.fl[x].slice(), sel: x === p || this.ok[x] ? this.sel[x].slice() : [], ok: this.ok[x] });
+    return { r: this.r, of: this.rounds.length, rounds: this.rounds, pos: this.done ? null : this.pos, cfg: this.done ? null : this.cfg, cur: this.cur, first: this.first, show: this.show, done: this.done, me: side(p), opp: side(q), picks: [this.picks[p].slice(), this.picks[q].slice()], prev: this.prev ? { me: this.prev[p].slice(), opp: this.prev[q].slice() } : null };
   }
   // times montados (formação padrão pros dois), prontos pra simular
   teams(info) {

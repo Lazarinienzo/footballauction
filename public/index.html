@@ -819,6 +819,23 @@ html[data-theme=light] .dc .fft{--cb:#fffdf7;color:#0f1a38}
 @keyframes dulan{40%{transform:scale(1.08);box-shadow:0 0 28px rgba(246,214,74,.6)}}
 .dintro em{font-style:normal;font-size:16px;color:var(--ink2);min-height:22px}
 .dteams{display:grid;gap:10px}
+.dcols{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
+.dcol{min-width:0;padding:12px 10px;border-radius:20px;background:var(--panel);border:1px solid var(--line)}
+.dcol.me{border-color:rgba(246,214,74,.5)}
+.dcn{display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center}
+.dcn b{font-family:var(--display);font-weight:800;font-size:16px;line-height:1.1;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dcn small{color:var(--mute);font-size:12px}
+.drt{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0 8px}
+.drt span{display:block;text-align:center;border-radius:12px;background:var(--panel2);padding:6px 2px}
+.drt small{display:block;font-size:10px;letter-spacing:.1em;color:var(--mute);font-weight:700}
+.drt b{font-family:var(--display);font-weight:800;font-size:20px;line-height:1.1}
+.dpr{display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid var(--line);font-size:12.5px;min-width:0}
+.dpr b{width:34px;flex:none;font-size:10.5px;letter-spacing:.04em;color:var(--mute)}
+.dpr i{flex:1;min-width:0;font-style:normal;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dpr em{font-style:normal;font-weight:800;color:var(--hi)}
+/* o que ficou de fora */
+.dtable.hold .dc:not(.sel) .fft{opacity:.78}
+.dc.missed .fft{filter:saturate(.55) brightness(.85)}
 .dtn{display:flex;align-items:center;gap:8px;margin-bottom:8px}.dtn b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dtn span{color:var(--mute);font-size:13px}
 .dpks{display:flex;flex-wrap:wrap;gap:5px}
 .dpk{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 8px 3px 6px;border-radius:99px;background:var(--wash2)}
@@ -1658,7 +1675,7 @@ function simSeason(teams, confs) {
 // Quem começa alterna a cada rodada; quem joga depois vê o que o outro virou. Formação padrão pros dois.
 const DU_CFG = { QB: { n: 6, f: 3, k: 1 }, RB: { n: 6, f: 3, k: 1 }, WR: { n: 6, f: 3, k: 2 }, TE: { n: 6, f: 3, k: 1 }, OL: { n: 6, f: 4, k: 3 }, EDGE: { n: 6, f: 3, k: 2 }, DT: { n: 6, f: 3, k: 2 }, LB: { n: 6, f: 3, k: 2 }, CB: { n: 6, f: 3, k: 2 } };
 const DU_TURN_MS = 30000;
-const DU_EXTRA = { first: 7500, round: 10500, swap: 5500 };   // tempo extra no relógio do turno pras animações (sorteio, cartas entrando e saindo da mesa)
+const DU_EXTRA = { first: 7500, round: 12300, swap: 7300 };   // tempo extra no relógio do turno pras animações (sorteio, cartas entrando e saindo da mesa)
 class Duelo {
   constructor(db, o) {
     o = o || {}; this.db = db.map((p, i) => ({ ...p, id: i })); this.show = !!o.show;
@@ -1668,6 +1685,7 @@ class Duelo {
   get cfg() { return DU_CFG[this.pos]; }
   draw() {
     const pos = this.pos, c = DU_CFG[pos], all = this.db.filter(p => p.pos === pos);
+    this.prev = this.board ? this.board.map(b => b.slice()) : null;       // tabuleiros da rodada anterior (pra revelar o que ficou de fora)
     this.board = [0, 1].map(() => shuffle(all).slice(0, c.n).map(p => p.id));
     this.fl = [[], []]; this.sel = [[], []]; this.ok = [false, false]; this.cur = (this.r + this.first) % 2;
   }
@@ -1693,8 +1711,9 @@ class Duelo {
   }
   // o que o jogador p pode ver: só as cartas viradas (as fechadas nem saem do servidor); as escolhas do rival aparecem quando ele confirma
   view(p) {
-    const q = 1 - p, side = x => ({ cards: this.board[x].map((id, i) => this.fl[x].includes(i) ? id : null), fl: this.fl[x].slice(), sel: x === p || this.ok[x] ? this.sel[x].slice() : [], ok: this.ok[x] });
-    return { r: this.r, of: this.rounds.length, rounds: this.rounds, pos: this.done ? null : this.pos, cfg: this.done ? null : this.cfg, cur: this.cur, first: this.first, show: this.show, done: this.done, me: side(p), opp: side(q), picks: [this.picks[p].slice(), this.picks[q].slice()] };
+    const q = 1 - p, side = x => ({ cards: this.board[x].map((id, i) => this.ok[x] || this.fl[x].includes(i) ? id : null),   // quem já confirmou mostra o tabuleiro todo (o que ficou de fora)
+     fl: this.fl[x].slice(), sel: x === p || this.ok[x] ? this.sel[x].slice() : [], ok: this.ok[x] });
+    return { r: this.r, of: this.rounds.length, rounds: this.rounds, pos: this.done ? null : this.pos, cfg: this.done ? null : this.cfg, cur: this.cur, first: this.first, show: this.show, done: this.done, me: side(p), opp: side(q), picks: [this.picks[p].slice(), this.picks[q].slice()], prev: this.prev ? { me: this.prev[p].slice(), opp: this.prev[q].slice() } : null };
   }
   // times montados (formação padrão pros dois), prontos pra simular
   teams(info) {
@@ -4113,7 +4132,9 @@ function dtStore(v) {
     [prev.me, prev.opp].forEach((sd, x) => {
       if (sd.ok) return;
       const add = v.picks[x].slice(prev.picks[x].length);
-      sd.sel = sd.cards.map((id, i) => id != null && add.includes(id) ? i : -1).filter(i => i >= 0); sd.ok = true;
+      if (!sd.ok) sd.sel = sd.cards.map((id, i) => id != null && add.includes(id) ? i : -1).filter(i => i >= 0);
+      sd.ok = true;
+      if (v.prev && v.r === prev.r + 1) sd.cards = (x === 0 ? v.prev.me : v.prev.opp).slice();      // mostra o tabuleiro todo (o que ficou de fora)
     });
   }
   const s = v.done ? { ...v, r: v.of - 1, pos: v.rounds[v.of - 1], cfg: DU_CFG[v.rounds[v.of - 1]] } : v;
@@ -4126,7 +4147,7 @@ function duShell(el) {
   <div class="dwho" id="dh-who"></div>
   <div class="dstage" id="dt-stage"></div>
   <div id="dt-act"></div><p class="dleg" id="dt-leg"></p>
-  <div class="yard" style="margin-top:26px;font-size:20px">${t('Times até agora')}</div><div class="dteams" id="dt-teams"></div>`;
+  <div class="yard" style="margin-top:26px;font-size:20px">${t('Times até agora')}</div><div class="dcols" id="dt-teams"></div>`;
   dtTeams();
 }
 function dtStep() {
@@ -4188,13 +4209,23 @@ function dtLegend(el, root) {
     setTimeout(() => { b.remove(); root.classList.remove('glow'); }, 2400);
   }, 650);
 }
+// carta que ficou de fora: vira só pra mostrar o que se perdeu
+function dtMiss(el, id) {
+  const f = el.querySelector('.fft'), [cls, html] = dtFront(id); f.className = cls; f.innerHTML = html; el.classList.add('flipped', 'missed');
+  sfx.flip(cls.includes('t-diamond') ? 'diamond' : cls.includes('t-gold') ? 'gold' : 'bronze');
+}
 // atualiza a mesa no lugar (sem recriar as cartas, senão a animação de virar se perde)
 function dtUpdate() {
   const d = DT.disp, v = DU.v; if (!d || !v) return;
   const s = DT.snaps[d.r], side = dtSide(s, d.who), c = s.cfg, root = $('#dt-stage');
   const can = dtCan(), canFlip = can && side.fl.length < c.f, canPick = can && side.fl.length >= c.f;
+  const hold = DT.phase === 'hold'; let miss = 0;
+  if (root.firstChild && root.firstChild.classList) root.firstChild.classList.toggle('hold', hold);
   root.querySelectorAll('.dc').forEach(el => {
     const i = +el.dataset.i, fl = side.fl.includes(i);
+    if (hold && !fl && side.cards[i] != null && !el.classList.contains('flipped') && !el.dataset.rv) {   // a mesa segura a escolha: o que ficou de fora vira, devagar
+      el.dataset.rv = 1; const id = side.cards[i]; dtAt(() => dtMiss(el, id), 300 + (miss++) * 170);
+    }
     if (fl && !el.classList.contains('flipped')) { const f = el.querySelector('.fft'), [cls, html] = dtFront(side.cards[i]); f.className = cls; f.innerHTML = html; el.classList.add('flipped'); if (!root.firstChild.classList.contains('inst')) sfx.flip(cls.includes('t-diamond') ? 'diamond' : cls.includes('t-gold') ? 'gold' : 'bronze'); if (cls.includes('t-diamond') && !root.firstChild.classList.contains('inst')) dtLegend(el, root); }
     el.classList.toggle('sel', side.sel.includes(i));
     el.classList.toggle('can', (canFlip && !fl) || (canPick && fl));
@@ -4213,17 +4244,27 @@ function dtUpdate() {
 // a escolha fica na mesa um instante, depois as cartas saem
 function dtLeave(cb) {
   const d = DT.disp, s = DT.snaps[d.r]; DT.lock = true; DT.phase = 'hold'; dtUpdate();
+  const sd0 = dtSide(s, d.who), nMiss = sd0.cards.filter((id, i) => id != null && !sd0.fl.includes(i)).length, hold = T_HOLD + (nMiss ? 300 + nMiss * 170 + 900 : 0);
   dtAt(() => {
     DT.phase = 'exit'; const tb = $('#dt-stage .dtable'); if (tb) tb.classList.add('leaving');
     dtAt(() => {
       const side = dtSide(s, d.who); DT.pk[d.who === s.you ? 0 : 1].push(...side.sel.map(i => side.cards[i]));
       dtTeams(); cb();
     }, T_EXIT + 300);
-  }, T_HOLD);
+  }, hold);
 }
+// os dois times lado a lado (anfitrião à esquerda, igual pros dois), nick em cima, ATQ/DEF ao vivo conforme as escolhas entram
 function dtTeams() {
   const box = $('#dt-teams'), v = DU.v; if (!box || !v) return;
-  const mk = k => { const sd = duSeat(k === 0 ? v.you : 1 - v.you); return `<div class="card"><div class="dtn">${badge(sd.emb, 22)}<b>${esc(sd.name)}</b><span class="num">${DT.pk[k].length}/16</span></div><div class="dpks">${duPicksHTML(DT.pk[k])}</div></div>`; };
+  const pk = s => DT.pk[s === v.you ? 0 : 1];
+  let rt = null; try { DU.shd = DU.shd || new Duelo(DB, {}); DU.shd.picks = [pk(0), pk(1)]; rt = DU.shd.teams(DU.seats).map(x => x.rt); } catch (e) { }
+  const mk = s => {
+    const sd = duSeat(s), ids = pk(s), by = {}; POS_ORDER.forEach(p => by[p] = []); ids.forEach(id => by[duP(id).pos].push(id));
+    const rows = POS_ORDER.flatMap(p => by[p].map(id => { const q = duP(id); return `<div class="dpr"><b>${p}</b><i>${esc(shortName(q.name))}</i>${DU.show ? `<em class="num">${q.ovr}</em>` : ''}</div>`; })).join('');
+    const val = k => rt && DU.show && rt[s][k] > .05 ? rt[s][k].toFixed(1) : '–';
+    return `<div class="dcol ${s === v.you ? 'me' : ''}"><div class="dcn">${badge(sd.emb, 34)}<b>${esc(sd.name)}</b><small class="num">${ids.length}/16</small></div>
+    <div class="drt"><span><small>${t('ATQ')}</small><b class="num">${val('off')}</b></span><span><small>${t('DEF')}</small><b class="num">${val('def')}</b></span></div>${rows || `<p class="note" style="text-align:center;margin:6px 0 0">${t('Ninguém escolhido ainda.')}</p>`}</div>`;
+  };
   box.innerHTML = mk(0) + mk(1);
 }
 function duTickUI() {

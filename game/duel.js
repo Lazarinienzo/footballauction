@@ -167,7 +167,9 @@ function dtStore(v) {
     [prev.me, prev.opp].forEach((sd, x) => {
       if (sd.ok) return;
       const add = v.picks[x].slice(prev.picks[x].length);
-      sd.sel = sd.cards.map((id, i) => id != null && add.includes(id) ? i : -1).filter(i => i >= 0); sd.ok = true;
+      if (!sd.ok) sd.sel = sd.cards.map((id, i) => id != null && add.includes(id) ? i : -1).filter(i => i >= 0);
+      sd.ok = true;
+      if (v.prev && v.r === prev.r + 1) sd.cards = (x === 0 ? v.prev.me : v.prev.opp).slice();      // mostra o tabuleiro todo (o que ficou de fora)
     });
   }
   const s = v.done ? { ...v, r: v.of - 1, pos: v.rounds[v.of - 1], cfg: DU_CFG[v.rounds[v.of - 1]] } : v;
@@ -180,7 +182,7 @@ function duShell(el) {
   <div class="dwho" id="dh-who"></div>
   <div class="dstage" id="dt-stage"></div>
   <div id="dt-act"></div><p class="dleg" id="dt-leg"></p>
-  <div class="yard" style="margin-top:26px;font-size:20px">${t('Times até agora')}</div><div class="dteams" id="dt-teams"></div>`;
+  <div class="yard" style="margin-top:26px;font-size:20px">${t('Times até agora')}</div><div class="dcols" id="dt-teams"></div>`;
   dtTeams();
 }
 function dtStep() {
@@ -242,13 +244,23 @@ function dtLegend(el, root) {
     setTimeout(() => { b.remove(); root.classList.remove('glow'); }, 2400);
   }, 650);
 }
+// carta que ficou de fora: vira só pra mostrar o que se perdeu
+function dtMiss(el, id) {
+  const f = el.querySelector('.fft'), [cls, html] = dtFront(id); f.className = cls; f.innerHTML = html; el.classList.add('flipped', 'missed');
+  sfx.flip(cls.includes('t-diamond') ? 'diamond' : cls.includes('t-gold') ? 'gold' : 'bronze');
+}
 // atualiza a mesa no lugar (sem recriar as cartas, senão a animação de virar se perde)
 function dtUpdate() {
   const d = DT.disp, v = DU.v; if (!d || !v) return;
   const s = DT.snaps[d.r], side = dtSide(s, d.who), c = s.cfg, root = $('#dt-stage');
   const can = dtCan(), canFlip = can && side.fl.length < c.f, canPick = can && side.fl.length >= c.f;
+  const hold = DT.phase === 'hold'; let miss = 0;
+  if (root.firstChild && root.firstChild.classList) root.firstChild.classList.toggle('hold', hold);
   root.querySelectorAll('.dc').forEach(el => {
     const i = +el.dataset.i, fl = side.fl.includes(i);
+    if (hold && !fl && side.cards[i] != null && !el.classList.contains('flipped') && !el.dataset.rv) {   // a mesa segura a escolha: o que ficou de fora vira, devagar
+      el.dataset.rv = 1; const id = side.cards[i]; dtAt(() => dtMiss(el, id), 300 + (miss++) * 170);
+    }
     if (fl && !el.classList.contains('flipped')) { const f = el.querySelector('.fft'), [cls, html] = dtFront(side.cards[i]); f.className = cls; f.innerHTML = html; el.classList.add('flipped'); if (!root.firstChild.classList.contains('inst')) sfx.flip(cls.includes('t-diamond') ? 'diamond' : cls.includes('t-gold') ? 'gold' : 'bronze'); if (cls.includes('t-diamond') && !root.firstChild.classList.contains('inst')) dtLegend(el, root); }
     el.classList.toggle('sel', side.sel.includes(i));
     el.classList.toggle('can', (canFlip && !fl) || (canPick && fl));
@@ -267,17 +279,27 @@ function dtUpdate() {
 // a escolha fica na mesa um instante, depois as cartas saem
 function dtLeave(cb) {
   const d = DT.disp, s = DT.snaps[d.r]; DT.lock = true; DT.phase = 'hold'; dtUpdate();
+  const sd0 = dtSide(s, d.who), nMiss = sd0.cards.filter((id, i) => id != null && !sd0.fl.includes(i)).length, hold = T_HOLD + (nMiss ? 300 + nMiss * 170 + 900 : 0);
   dtAt(() => {
     DT.phase = 'exit'; const tb = $('#dt-stage .dtable'); if (tb) tb.classList.add('leaving');
     dtAt(() => {
       const side = dtSide(s, d.who); DT.pk[d.who === s.you ? 0 : 1].push(...side.sel.map(i => side.cards[i]));
       dtTeams(); cb();
     }, T_EXIT + 300);
-  }, T_HOLD);
+  }, hold);
 }
+// os dois times lado a lado (anfitrião à esquerda, igual pros dois), nick em cima, ATQ/DEF ao vivo conforme as escolhas entram
 function dtTeams() {
   const box = $('#dt-teams'), v = DU.v; if (!box || !v) return;
-  const mk = k => { const sd = duSeat(k === 0 ? v.you : 1 - v.you); return `<div class="card"><div class="dtn">${badge(sd.emb, 22)}<b>${esc(sd.name)}</b><span class="num">${DT.pk[k].length}/16</span></div><div class="dpks">${duPicksHTML(DT.pk[k])}</div></div>`; };
+  const pk = s => DT.pk[s === v.you ? 0 : 1];
+  let rt = null; try { DU.shd = DU.shd || new Duelo(DB, {}); DU.shd.picks = [pk(0), pk(1)]; rt = DU.shd.teams(DU.seats).map(x => x.rt); } catch (e) { }
+  const mk = s => {
+    const sd = duSeat(s), ids = pk(s), by = {}; POS_ORDER.forEach(p => by[p] = []); ids.forEach(id => by[duP(id).pos].push(id));
+    const rows = POS_ORDER.flatMap(p => by[p].map(id => { const q = duP(id); return `<div class="dpr"><b>${p}</b><i>${esc(shortName(q.name))}</i>${DU.show ? `<em class="num">${q.ovr}</em>` : ''}</div>`; })).join('');
+    const val = k => rt && DU.show && rt[s][k] > .05 ? rt[s][k].toFixed(1) : '–';
+    return `<div class="dcol ${s === v.you ? 'me' : ''}"><div class="dcn">${badge(sd.emb, 34)}<b>${esc(sd.name)}</b><small class="num">${ids.length}/16</small></div>
+    <div class="drt"><span><small>${t('ATQ')}</small><b class="num">${val('off')}</b></span><span><small>${t('DEF')}</small><b class="num">${val('def')}</b></span></div>${rows || `<p class="note" style="text-align:center;margin:6px 0 0">${t('Ninguém escolhido ainda.')}</p>`}</div>`;
+  };
   box.innerHTML = mk(0) + mk(1);
 }
 function duTickUI() {
