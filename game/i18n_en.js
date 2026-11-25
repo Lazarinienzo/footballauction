@@ -376,3 +376,4 @@ Object.assign(I18N.en, {
   'Franquias inspiradas nos times da NFL. Você pode renomear o time.': 'Franchises inspired by NFL teams. You can rename the team.',
   'Franquia': 'Franchise'
 });
+Object.assign(I18N.en, { 'Os 32 times da NFL. Você pode renomear o seu time.': 'All 32 NFL teams. You can rename your team.' });

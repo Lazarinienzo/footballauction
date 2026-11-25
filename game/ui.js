@@ -5,7 +5,7 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const MAX_BOTS = Math.min(7, maxTeams(DB) - 1);
 
-// ----- franquias fictícias (paródias de times da NFL) e seus símbolos -----
+// ----- os 32 times da NFL e seus símbolos (ícone próprio só aparece se faltar a logo) -----
 const INK = '#0b1226';
 const EMB = [
   ['Buffalo Wings', '#5aa9ff', `<path d="M3 18C3 9 9 4 21 4c0 9-5 15-14 15-1.5 0-2.7-.4-4-1z"/><path fill="none" stroke="${INK}" stroke-width="1.6" stroke-linecap="round" d="M5 19L16 8"/>`],
@@ -41,18 +41,19 @@ const EMB = [
   ['San Francisco Prospectors', '#f0b44a', '<path fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" d="M3 9c4-4.5 14-4.5 18 0M12 5.5V21"/>'],
   ['Seattle Drizzles', '#7fe3f0', '<path d="M7 16a4 4 0 0 1-.6-8A5.5 5.5 0 0 1 17 7a4.5 4.5 0 0 1 .5 9z"/><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" d="M8 19.5l-1 2M12 19.5l-1 2M16 19.5l-1 2"/>'],
 ];
-// nomes das franquias em português: paródias diretas dos nomes em inglês ("Os X de Cidade")
+// cidade e apelido oficiais dos times
 const EMB_CITY = ['Buffalo', 'Miami', 'New England', 'New York', 'Baltimore', 'Cincinnati', 'Cleveland', 'Pittsburgh', 'Houston', 'Indianapolis', 'Jacksonville', 'Tennessee', 'Denver', 'Kansas City', 'Las Vegas', 'Los Angeles', 'Dallas', 'New York', 'Philadelphia', 'Washington', 'Chicago', 'Detroit', 'Green Bay', 'Minnesota', 'Atlanta', 'Carolina', 'New Orleans', 'Tampa Bay', 'Arizona', 'Los Angeles', 'San Francisco', 'Seattle'];
-const EMB_NICK = ['As Contas', 'Os Golfinhos', 'Os Patriotas', 'Os Jatos', 'Os Corvos', 'Os Tigres de Bengala', 'Os Marrons', 'Os Siderúrgicos', 'Os Texanos', 'Os Potros', 'Os Jaguares', 'Os Titãs', 'Os Cavalos Selvagens', 'Os Chefes', 'Os Invasores', 'Os Carregadores', 'Os Vaqueiros', 'Os Gigantes', 'As Águias', 'Os Comandantes', 'Os Ursos', 'Os Leões', 'Os Empacotadores', 'Os Vikings', 'Os Falcões', 'As Panteras', 'Os Santos', 'Os Bucaneiros', 'Os Cardeais', 'Os Carneiros', 'Os Garimpeiros', 'Os Gaviões-do-Mar'];
-const emN = i => LANG === 'pt' ? EMB_NICK[i] + ' de ' + EMB_CITY[i] : EMB[i][0];
-const emParts = i => LANG === 'pt' ? [EMB_CITY[i], EMB_NICK[i]] : (() => { const n = EMB[i][0], k = n.lastIndexOf(' '); return [n.slice(0, k), n.slice(k + 1)]; })();
+const EMB_NICK = ['Bills', 'Dolphins', 'Patriots', 'Jets', 'Ravens', 'Bengals', 'Browns', 'Steelers', 'Texans', 'Colts', 'Jaguars', 'Titans', 'Broncos', 'Chiefs', 'Raiders', 'Chargers', 'Cowboys', 'Giants', 'Eagles', 'Commanders', 'Bears', 'Lions', 'Packers', 'Vikings', 'Falcons', 'Panthers', 'Saints', 'Buccaneers', 'Cardinals', 'Rams', '49ers', 'Seahawks'];
+const emN = i => EMB_CITY[i] + ' ' + EMB_NICK[i];
+const emParts = i => [EMB_CITY[i], EMB_NICK[i]];
 // nome curto pra frases com verbo ("Dallas abre o placar"): em PT usa a cidade se o time tem o nome automático
 const tsh = x => (LANG === 'pt' && x.name === emN(x.emb)) ? EMB_CITY[x.emb] : x.name;
-const confTok = (nm, emb) => (LANG === 'pt' && emb != null && nm === emN(emb)) ? EMB_NICK[emb].replace(/^(Os|As) /, '').split(' ')[0] : nm;
+const confTok = (nm, emb) => (LANG === 'pt' && emb != null && nm === emN(emb)) ? EMB_NICK[emb] : nm;
 const TEAM_CODES = ['BUF','MIA','NE','NYJ','BAL','CIN','CLE','PIT','HOU','IND','JAX','TEN','DEN','KC','LV','LAC','DAL','NYG','PHI','WAS','CHI','DET','GB','MIN','ATL','CAR','NO','TB','ARI','LAR','SF','SEA'];
 const frIdx = p => Math.max(0, TEAM_CODES.indexOf(p.tm));
 const NFL = ['Buffalo Bills','Miami Dolphins','New England Patriots','New York Jets','Baltimore Ravens','Cincinnati Bengals','Cleveland Browns','Pittsburgh Steelers','Houston Texans','Indianapolis Colts','Jacksonville Jaguars','Tennessee Titans','Denver Broncos','Kansas City Chiefs','Las Vegas Raiders','Los Angeles Chargers','Dallas Cowboys','New York Giants','Philadelphia Eagles','Washington Commanders','Chicago Bears','Detroit Lions','Green Bay Packers','Minnesota Vikings','Atlanta Falcons','Carolina Panthers','New Orleans Saints','Tampa Bay Buccaneers','Arizona Cardinals','Los Angeles Rams','San Francisco 49ers','Seattle Seahawks'];
 const frName = p => NFL[frIdx(p)];
+EMB.forEach((e, i) => { e[0] = NFL[i]; });
 // logos oficiais: só os times que têm arquivo em public/logos/<sigla>.webp. Pra desligar tudo, USE_LOGOS = false
 const USE_LOGOS = true;
 const LOGO_OK = new Set(TEAM_CODES.map(c => c.toLowerCase())); // os 32 times têm arquivo em public/logos
@@ -1094,7 +1095,7 @@ function fixConfNames(cs) {
   if (cs.length > 1 && cs[0].name === cs[1].name) cs[1].name += '²';
 }
 function renameForLang(from, to) {
-  const nm = (l, i) => l === 'pt' ? EMB_NICK[i] + ' de ' + EMB_CITY[i] : EMB[i][0], map = {};
+  const nm = (l, i) => emN(i), map = {};
   EMB.forEach((_, i) => { map[nm(from, i)] = nm(to, i); });
   const fix = s => (typeof s === 'string' && map[s]) || s;
   L.name = fix(L.name); L.bots.forEach(b => { b.name = fix(b.name); });
