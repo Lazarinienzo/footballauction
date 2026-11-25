@@ -53,7 +53,13 @@ const TEAM_CODES = ['BUF','MIA','NE','NYJ','BAL','CIN','CLE','PIT','HOU','IND','
 const frIdx = p => Math.max(0, TEAM_CODES.indexOf(p.tm));
 const NFL = ['Buffalo Bills','Miami Dolphins','New England Patriots','New York Jets','Baltimore Ravens','Cincinnati Bengals','Cleveland Browns','Pittsburgh Steelers','Houston Texans','Indianapolis Colts','Jacksonville Jaguars','Tennessee Titans','Denver Broncos','Kansas City Chiefs','Las Vegas Raiders','Los Angeles Chargers','Dallas Cowboys','New York Giants','Philadelphia Eagles','Washington Commanders','Chicago Bears','Detroit Lions','Green Bay Packers','Minnesota Vikings','Atlanta Falcons','Carolina Panthers','New Orleans Saints','Tampa Bay Buccaneers','Arizona Cardinals','Los Angeles Rams','San Francisco 49ers','Seattle Seahawks'];
 const frName = p => NFL[frIdx(p)];
-const badge = (i, px) => { const e = EMB[i] || EMB[0]; return `<span class="emb" style="--c:${e[1]};--s:${px || 32}px"><svg viewBox="0 0 24 24" fill="currentColor" aria-label="${emN(EMB.indexOf(e))}">${e[2]}</svg></span>`; };
+// logos oficiais: só os times que têm arquivo em public/logos/<sigla>.webp. Pra desligar tudo, USE_LOGOS = false
+const USE_LOGOS = true;
+const LOGO_OK = new Set(['den', 'ari', 'lar', 'sea', 'sf', 'no', 'atl', 'tb', 'car', 'gb', 'min', 'chi', 'det', 'phi', 'was', 'dal', 'nyg', 'lac', 'lv', 'kc']);
+const logoSrc = i => { const c = (TEAM_CODES[i] || '').toLowerCase(); return USE_LOGOS && LOGO_OK.has(c) ? `/logos/${c}.webp?v=1` : null; };
+const badge = (i, px) => { const e = EMB[i] || EMB[0], j = EMB.indexOf(e), lg = logoSrc(j);
+  if (lg) return `<span class="emb logo" style="--c:${e[1]};--s:${px || 32}px"><img src="${lg}" alt="${emN(j)}" width="${px || 32}" height="${px || 32}" decoding="async" draggable="false"></span>`;
+  return `<span class="emb" style="--c:${e[1]};--s:${px || 32}px"><svg viewBox="0 0 24 24" fill="currentColor" aria-label="${emN(j)}">${e[2]}</svg></span>`; };
 const resL = r => t(RES[r]);
 const RES = { TD: 'Touchdown', FG: 'Field goal', MISS: 'Chute errado', PUNT: 'Punt', INT: 'Interceptação', FUM: 'Fumble', DOWNS: '4ª descida', SACK: 'Sack' };
 // aviso na tela de cada final de posse: título, tema, duração do aviso, pausa na rodada, quem aparece no escudo (o=ataque, d=defesa) e o texto de apoio
@@ -923,8 +929,8 @@ function statsHTML(S) {
 
 // ----- cartão do time (imagem pra compartilhar) -----
 const SHR = { url: '' };
-const emblemImg = (i, px) => new Promise(res => { const e = EMB[i] || EMB[0], im = new Image(); im.onload = () => res(im); im.onerror = () => res(null);
-  im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${px}" height="${px}" fill="${e[1]}" style="color:${e[1]}">${e[2]}</svg>`); });
+const emblemImg = (i, px) => new Promise(res => { const e = EMB[i] || EMB[0], im = new Image(), lg = logoSrc(i); im.onload = () => res(im); im.onerror = () => res(null);
+  im.src = lg || 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${px}" height="${px}" fill="${e[1]}" style="color:${e[1]}">${e[2]}</svg>`); });
 async function teamCardURL(t, info) {
   info = info || {};
   try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) {}
@@ -936,8 +942,10 @@ async function teamCardURL(t, info) {
   c.textBaseline = 'alphabetic'; c.textAlign = 'left';
   c.fillStyle = '#f6d64a'; c.font = B(800, 26); if ('letterSpacing' in c) c.letterSpacing = '5px'; c.fillText('TOUCHDOWN AUCTION', 60, 70); if ('letterSpacing' in c) c.letterSpacing = '0px';
   const em = EMB[t.emb] || EMB[0], img = await emblemImg(t.emb, 96);
-  c.fillStyle = em[1] + '30'; rr(60, 100, 118, 118, 38); c.fill(); c.strokeStyle = em[1] + '99'; c.lineWidth = 3; rr(60, 100, 118, 118, 38); c.stroke();
-  if (img) c.drawImage(img, 71, 111, 96, 96);
+  const lg = !!logoSrc(t.emb);
+  c.fillStyle = lg ? '#f4f6fb' : em[1] + '30'; rr(60, 100, 118, 118, 38); c.fill(); c.strokeStyle = lg ? 'rgba(255,255,255,.5)' : em[1] + '99'; c.lineWidth = 3; rr(60, 100, 118, 118, 38); c.stroke();
+  if (img && lg) { const k = Math.min(80 / img.naturalWidth, 80 / img.naturalHeight), w = img.naturalWidth * k, h = img.naturalHeight * k; c.drawImage(img, 119 - w / 2, 159 - h / 2, w, h); }
+  else if (img) c.drawImage(img, 71, 111, 96, 96);
   c.fillStyle = '#fff'; let nfz = 62; c.font = F(800, nfz); while (nfz > 34 && c.measureText(t.name).width > 840) { nfz -= 2; c.font = F(800, nfz); } c.fillText(fit(t.name, 840), 204, 160);
   c.font = B(700, 31); c.fillStyle = info.gold ? '#f6d64a' : '#a9b6d3';
   c.fillText(fit(info.text ? info.text + (info.rec ? ' · ' + info.rec : '') : tt('Elenco fechado · gastou {n}', { n: '$' + (BUDGET - t.budget) }), 840), 204, 206);
