@@ -22,8 +22,8 @@ const SLOTS = { QB: 1, RB: 1, WR: 2, TE: 1, OL: 3, EDGE: 2, DT: 2, LB: 2, CB: 2 
 const POS_ORDER = ['QB', 'RB', 'WR', 'TE', 'OL', 'EDGE', 'DT', 'LB', 'CB'];
 const OFF_POS = ['QB', 'RB', 'WR', 'TE', 'OL'];
 const TOTAL_SLOTS = 16, BUDGET = 200;
-// Modo com reservas: 20 jogadores. O elenco tem o máximo de cada posição entre todas as formações; quem não está entre os 16 titulares fica no banco.
-const BENCH_SLOTS = { QB: 1, RB: 1, WR: 3, TE: 2, OL: 3, EDGE: 2, DT: 2, LB: 3, CB: 3 }, BENCH_TOTAL = 20;
+// Modo com reservas: 20 jogadores = os 16 da formação padrão (mínimo de cada posição) + 4 reservas LIVRES, de qualquer posição.
+const BENCH_TOTAL = 20;
 // Formações (só no modo com reservas): quantos titulares cada posição tem. Padrão = a do jogo clássico.
 const FORMS = {
   off: { std: { WR: 2, TE: 1 }, w3: { WR: 3, TE: 0 }, te2: { WR: 1, TE: 2 } },
@@ -32,7 +32,7 @@ const FORMS = {
 const STD = { off: 'std', def: 'std' };
 const formSlots = f => ({ QB: 1, RB: 1, OL: 3, EDGE: 2, ...FORMS.off[(f || STD).off], ...FORMS.def[(f || STD).def] });
 // configura o time pro modo do leilão (cada time carrega suas vagas, então o servidor pode ter várias salas ao mesmo tempo)
-function cfgTeam(t, bench) { t.bench = !!bench; t.slots = bench ? BENCH_SLOTS : SLOTS; t.total = bench ? BENCH_TOTAL : TOTAL_SLOTS; if (!t.form) t.form = { ...STD }; return t; }
+function cfgTeam(t, bench) { t.bench = !!bench; t.slots = SLOTS; t.total = bench ? BENCH_TOTAL : TOTAL_SLOTS; if (!t.form) t.form = { ...STD }; return t; }
 const LOT_MS = 6000, BID_MS = 4000;   // tempo do lote; cada lance leva o relógio pra BID_MS
 let RNG = Math.random;                         // gerador trocável: com semente, todos os clientes sorteiam a mesma temporada
 const R = () => RNG();
@@ -59,6 +59,21 @@ function lineup(roster, order, form) {
 }
 // Peso de cada posição no OVR do time. A base é 1,0x; a média é sempre dividida pela soma dos pesos, então a escala do OVR não muda.
 const WEIGHT = { QB: 2.5, RB: 1.0, WR: 1.5, TE: 1.0, OL: 1.0, EDGE: 2.0, DT: 1.0, LB: 1.5, CB: 1.5 };   // base 1,0x; degraus 1,5x e 2,0x; o QB vale 2,5x
+// Peso de cada posição em cada formação (degraus de 0,5, nunca abaixo de 1,0x). A média é dividida pela soma dos pesos, então subir o foco
+// da formação tira importância relativa das outras posições. A padrão é a de sempre.
+const FW = {
+  off: {
+    std: { QB: 2.5, RB: 1, WR: 1.5, TE: 1, OL: 1 },
+    w3: { QB: 3.5, RB: 1, WR: 2.5, TE: 1, OL: 1 },      // 3 WR, sem TE: passe manda, linha e RB ficam em segundo plano
+    te2: { QB: 2, RB: 2.5, WR: 1.5, TE: 2, OL: 2 }      // 2 TE: jogo corrido e de bloqueio, o QB e o único WR perdem peso relativo
+  },
+  def: {
+    std: { EDGE: 2, DT: 1, LB: 1.5, CB: 1.5 },
+    cb3: { EDGE: 2, DT: 1, LB: 1, CB: 2.5 },            // 3 CB, 1 LB: a secundária manda
+    lb3: { EDGE: 2, DT: 1, LB: 2.5, CB: 1 }           // 3 LB, 1 DT: o meio manda
+  }
+};
+const wOf = (side, f, pos) => FW[side][f][pos];
 // Posições no campo (x, y em "casas"): o desenho da tela e as sinergias usam as MESMAS coordenadas.
 // [posição, índice (0 = melhor OVR da posição), x, y]
 const SPOT = {
@@ -76,13 +91,13 @@ const SPOT = {
 const SYN_DIST = 1.6;   // só jogadores vizinhos no campo se conectam
 // Titulares de cada lado, com o peso e o lugar da posição.
 function sideStarters(L, side) {
-  return SPOT[side][(L.form || STD)[side]].map(([pos, i, x, y]) => ({ pos, i, x, y, p: L.S[pos][i], w: WEIGHT[pos] }));
+  return SPOT[side][(L.form || STD)[side]].map(([pos, i, x, y]) => ({ pos, i, x, y, p: L.S[pos][i], w: wOf(side, (L.form || STD)[side], pos) }));
 }
 // SINERGIA: dois titulares do MESMO lado, do mesmo time da NFL e VIZINHOS no campo formam um link.
 // Cada link soma +SYN_W no PESO dos dois jogadores (RB 1,0x ligado ao QB vira 1,1x; o QB vai de 2,5x a 2,6x), e o peso extra
 // conta inteiro no OVR do lado (a média continua dividida pelo peso base, então é bônus de verdade). Teto de SYN_CAP pontos por lado.
 const SYN_W = 0.1, SYN_CAP = 4;
-const sideW = (side, f) => SPOT[side][f].reduce((n, q) => n + WEIGHT[q[0]], 0);   // soma dos pesos da formação do lado
+const sideW = (side, f) => SPOT[side][f].reduce((n, q) => n + wOf(side, f, q[0]), 0);   // soma dos pesos da formação do lado
 function synLinks(L, side) {
   const xs = sideStarters(L, side).filter(x => x.p && x.p.tm), out = [];
   for (let i = 0; i < xs.length; i++) for (let j = i + 1; j < xs.length; j++)
@@ -121,6 +136,8 @@ function normOrder(roster, order, form) {
   return out;
 }
 const validForm = (f, bench) => { const o = {}; for (const sd of ['off', 'def']) o[sd] = bench && f && FORMS[sd][f[sd]] ? f[sd] : 'std'; return o; };
+// a formação do lado só dá pra montar se o elenco tem jogadores de sobra em cada posição dela
+const feasible = (roster, side, f) => { const fs = formSlots({ ...STD, [side]: f }); return [...new Set(SPOT[side][f].map(q => q[0]))].every(pos => roster.filter(p => p.pos === pos).length >= fs[pos]); };
 const kperms = (a, k) => k <= 0 ? [[]] : a.length === 0 ? [Array(k).fill(null)] : a.flatMap((x, i) => kperms(a.filter((_, j) => j !== i), k - 1).map(r => [x, ...r]));
 // melhor plano (formação + quem joga onde) pra um elenco: maximiza o OVR de cada lado (média ponderada + sinergia). Usado pelos bots.
 function autoPlan(roster, bench) {
@@ -128,6 +145,7 @@ function autoPlan(roster, bench) {
   for (const side of ['off', 'def']) {
     let best = null;
     for (const f of bench ? Object.keys(FORMS[side]) : ['std']) {
+      if (f !== 'std' && !feasible(roster, side, f)) continue;
       const fm = { ...form, [side]: f }, base = normOrder(roster, order, fm), fs = formSlots(fm);
       const poss = [...new Set(SPOT[side][f].map(q => q[0]))], pools = poss.map(pos => kperms(roster.filter(x => x.pos === pos).map(x => x.id), fs[pos]));
       const go = (k, cur) => {
@@ -197,20 +215,23 @@ function simGame(tA, tB, opts) {
 
 // ---------- leilão ----------
 const POSW = { QB: 1.6, RB: 1.0, WR: 1.15, TE: 1.0, OL: 1.05, EDGE: 1.3, DT: 1.0, LB: 1.0, CB: 1.15 };
-const need = (t, pos) => (t.slots || SLOTS)[pos] - t.roster.filter(p => p.pos === pos).length;
 const slotsLeft = t => (t.total || TOTAL_SLOTS) - t.roster.length;
+// vagas obrigatórias que faltam na posição (o mínimo é a formação padrão) e reservas livres (qualquer posição) que ainda restam
+const mand = (t, pos) => Math.max(0, SLOTS[pos] - t.roster.filter(p => p.pos === pos).length);
+const freeSlots = t => Math.max(0, slotsLeft(t) - POS_ORDER.reduce((n, pos) => n + mand(t, pos), 0));
+const need = (t, pos) => mand(t, pos) + freeSlots(t);
 const maxBid = (t, p) => need(t, p.pos) <= 0 ? 0 : Math.max(0, t.budget - (slotsLeft(t) - 1));
 
-function maxTeams(db, slots) {
-  slots = slots || SLOTS; const c = {}; db.forEach(p => c[p.pos] = (c[p.pos] || 0) + 1);
-  return Math.min(...POS_ORDER.map(pos => Math.floor((c[pos] || 0) / slots[pos])));
+const posNeed = (pos, n, free) => SLOTS[pos] * n + Math.ceil((free || 0) * n / POS_ORDER.length);   // reservas livres: espalha a demanda por todas as posições
+function maxTeams(db, free) {
+  const c = {}; db.forEach(p => c[p.pos] = (c[p.pos] || 0) + 1);
+  return Math.min(...POS_ORDER.map(pos => { let n = 0; while (posNeed(pos, n + 1, free) <= (c[pos] || 0)) n++; return n; }));
 }
-function makePool(db, n, extra, slots) {
-  slots = slots || SLOTS;
+function makePool(db, n, extra, free) {
   extra = extra == null ? .5 : extra;           // sobra de jogadores por posição (50% a mais, mínimo +2)
   const pool = [];
   for (const pos of POS_ORDER) {
-    const all = db.filter(p => p.pos === pos), need = slots[pos] * n;
+    const all = db.filter(p => p.pos === pos), need = posNeed(pos, n, free);
     const take = Math.min(all.length, need + Math.max(2, Math.ceil(need * extra)));
     pool.push(...shuffle(all).slice(0, take));
   }
@@ -223,7 +244,7 @@ function newBot(id, name, bench) {
 
 class Auction {
   constructor(teams, db, extra) {
-    this.teams = teams; this.pool = makePool(db, teams.length, extra, teams[0].slots); this.i = -1; this.log = []; this.done = false; this.now = 0;
+    this.teams = teams; this.pool = makePool(db, teams.length, extra, (teams[0].total || TOTAL_SLOTS) - TOTAL_SLOTS); this.i = -1; this.log = []; this.done = false; this.now = 0;
     this.total = teams.length * (teams[0].total || TOTAL_SLOTS); this.soldCount = 0; this.version = 0;
     this.stats = {};
     for (const pos of POS_ORDER) {
@@ -243,21 +264,24 @@ class Auction {
   }
   get human() { return this.teams.find(t => t.human); }
   supply(pos) { return this.pool.reduce((n, p) => n + (p.pos === pos && !p.sold ? 1 : 0), 0); }   // jogadores ainda no pool
-  demand(pos) { return this.teams.reduce((n, t) => n + Math.max(0, need(t, pos)), 0); }            // vagas ainda abertas
+  demand(pos) { return this.teams.reduce((n, t) => n + mand(t, pos), 0); }                         // vagas obrigatórias ainda abertas (reserva é opcional)
   limit(t, p) {
     const s = this.stats[p.pos], z = (p.ovr - s.m) / s.sd, q = clamp(1 + .6 * z, .3, 2.8);
     // sobrou jogador na posição? bot sem pressa deixa os fracos passarem (até 2 vezes)
     if (this.supply(p.pos) > this.demand(p.pos) && p.passes < 2 && z < -.3 && R() < clamp((-z - .2) * .7, 0, .9)) return 0;
+    const reserve = mand(t, p.pos) === 0;        // esse lote só serviria de reserva (ou de upgrade): bot paga menos e ignora jogador comum
+    if (reserve && p.passes < 2 && z < .4) return 0;
     const urg = 1 + .6 * (1 - slotsLeft(t) / (t.total || TOTAL_SLOTS));
     const syn = 1 + .07 * Math.min(3, t.roster.filter(x => x.tm && x.tm === p.tm && (OFF_POS.includes(x.pos) === OFF_POS.includes(p.pos))).length);   // bot paga um pouco mais por quem liga com o elenco
-    let w = (t.budget / slotsLeft(t)) * q * POSW[p.pos] * t.persona.aggr * t.persona.pos[p.pos] * urg * syn * (.85 + R() * .3);
+    const share = Math.max(1, POS_ORDER.reduce((n, pos) => n + mand(t, pos), 0) + freeSlots(t) * .35);
+    let w = (t.budget / share) * (reserve ? .5 : 1) * q * POSW[p.pos] * t.persona.aggr * t.persona.pos[p.pos] * urg * syn * (.85 + R() * .3);
     if (slotsLeft(t) === 1) w = Math.max(w, t.budget * .7);
     return clamp(Math.round(w), 1, maxBid(t, p));
   }
   next() {
     if (this.soldCount >= this.total) { this.done = true; this.phase = 'done'; return; }
     const n = this.pool.length; let found = -1;
-    for (let k = 1; k <= n; k++) { const j = (this.i + k + n) % n, q = this.pool[j]; if (!q.sold && !q.deferred && this.demand(q.pos) > 0) { found = j; break; } }
+    for (let k = 1; k <= n; k++) { const j = (this.i + k + n) % n, q = this.pool[j]; if (!q.sold && !q.deferred && this.teams.some(t => need(t, q.pos) > 0)) { found = j; break; } }
     if (found < 0) { this.autoFill(); this.done = true; this.phase = 'done'; return; }
     this.i = found;
     const p = this.cur;
@@ -338,14 +362,14 @@ class Auction {
   }
   // fim do leilão: quem ainda tem vaga aberta recebe, por sorteio, jogadores que sobraram nas posições que faltam (US$ 1 cada)
   autoFill() {
-    for (const t of shuffle(this.teams.filter(x => slotsLeft(x) > 0))) for (const pos of POS_ORDER) {
-      while (need(t, pos) > 0) {
-        const c = this.pool.filter(p => p.pos === pos && !p.sold); if (!c.length) break;
-        const p = c[rint(0, c.length - 1)], price = Math.min(1, t.budget);
-        t.budget -= price; t.roster.push({ name: p.name, pos: p.pos, ovr: p.ovr, tm: p.tm, id: p.id, paid: price });
+    for (const t of shuffle(this.teams.filter(x => slotsLeft(x) > 0))) {
+      const give = p => {
+        const price = Math.min(1, t.budget); t.budget -= price; t.roster.push({ name: p.name, pos: p.pos, ovr: p.ovr, tm: p.tm, id: p.id, paid: price });
         p.sold = true; this.soldCount++; (t.auto = t.auto || []).push(p);
         this.log.unshift({ player: p, team: t, price, note: 'sorteio no fim' }); this.log.length = Math.min(this.log.length, 40);
-      }
+      };
+      for (const pos of POS_ORDER) while (mand(t, pos) > 0) { const c = this.pool.filter(p => p.pos === pos && !p.sold); if (!c.length) break; give(c[rint(0, c.length - 1)]); }
+      while (freeSlots(t) > 0) { const c = this.pool.filter(p => !p.sold); if (!c.length) break; give(c[rint(0, c.length - 1)]); }   // reservas livres: sobras de qualquer posição
     }
     this.version++;
   }
@@ -395,7 +419,12 @@ function drawConferences(teams) {
 
 // ---------- temporada ----------
 function finishTeam(t) {
-  if (t.order) { t.form = validForm(t.form, t.bench); t.order = normOrder(t.roster, t.order, t.form); }
+  if (t.order) {
+    t.form = validForm(t.form, t.bench);
+    const bad = ['off', 'def'].filter(sd => t.form[sd] !== 'std' && !feasible(t.roster, sd, t.form[sd]));     // formação escolhida sem jogador suficiente: o jogo escolhe a melhor viável
+    if (bad.length) { const pl = autoPlan(t.roster, t.bench); bad.forEach(sd => t.form[sd] = pl.form[sd]); }
+    t.order = normOrder(t.roster, t.order, t.form);
+  }
   else { const pl = autoPlan(t.roster, t.bench); t.form = pl.form; t.order = pl.order; }
   t.lineup = lineup(t.roster, t.order, t.form); t.rt = ratings(t.lineup); return t;
 }
@@ -488,4 +517,4 @@ function simSeason(teams, confs) {
 }
 
 
-export { DB, SLOTS, POS_ORDER, OFF_POS, TOTAL_SLOTS, BUDGET, FORMS, BENCH_SLOTS, BENCH_TOTAL, Auction, newBot, cfgTeam, validForm, maxTeams, finishTeam, withSeed, rint, R, maxBid, need, slotsLeft, MIN_TEAMS };
+export { DB, SLOTS, POS_ORDER, OFF_POS, TOTAL_SLOTS, BUDGET, FORMS, BENCH_TOTAL, Auction, newBot, cfgTeam, validForm, maxTeams, feasible, finishTeam, withSeed, rint, R, maxBid, need, slotsLeft, MIN_TEAMS };

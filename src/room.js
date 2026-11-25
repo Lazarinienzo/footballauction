@@ -1,6 +1,6 @@
 // Uma sala do Touchdown Auction. O leilão roda aqui (servidor manda), os clientes só mostram e mandam lance/passar.
 import { DurableObject } from 'cloudflare:workers';
-import { DB, BUDGET, Auction, newBot, finishTeam, MIN_TEAMS, POS_ORDER, SLOTS, BENCH_SLOTS, validForm } from './engine.js';
+import { DB, BUDGET, Auction, newBot, finishTeam, MIN_TEAMS, POS_ORDER, SLOTS, validForm } from './engine.js';
 
 const MAX_SEATS = 8, EMB_N = 32, HOLD_MS = 3500, AWAY_BOT_MS = 12000, LOBBY_AWAY_MS = 25000;
 const clean = s => String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 44);
@@ -174,8 +174,8 @@ export class Room extends DurableObject {
   // arranjo do campo (em que vaga cada titular joga): só humano, só durante o leilão; o servidor completa/valida na hora de usar (normOrder)
   order(s, m) {
     if (this.phase !== 'auction' || !s.team || !s.team.human || !m.o || typeof m.o !== 'object') return;
-    const lim = this.bench ? BENCH_SLOTS : SLOTS, o = {};
-    for (const pos of POS_ORDER) { const a = m.o[pos]; if (Array.isArray(a)) o[pos] = a.slice(0, lim[pos]).map(x => Number.isInteger(x) ? x : null); }
+    const o = {};
+    for (const pos of POS_ORDER) { const a = m.o[pos]; if (Array.isArray(a)) o[pos] = a.slice(0, 3).map(x => Number.isInteger(x) ? x : null); }
     s.team.order = o; s.team.form = validForm(m.f, this.bench);                   // formação é pública: vai nos snapshots
   }
   step() {

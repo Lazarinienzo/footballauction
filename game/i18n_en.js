@@ -406,3 +406,11 @@ Object.assign(I18N.en, {
   'Toque num jogador e depois em outra vaga da mesma posição pra mudar de lugar.': 'Tap a player, then another spot of the same position to move them.',
   'Sinergia: dois titulares do mesmo time da NFL, do mesmo lado e lado a lado no campo ganham uma linha na cor do time. Cada link soma +0,1x no peso dos dois (o RB de 1,0x ligado ao QB vira 1,1x, e o QB de 2,5x vira 2,6x), e esse peso extra vira pontos de OVR, até +4 por lado. Você escolhe em que vaga cada jogador joga: toque num jogador e depois em outra vaga da mesma posição pra trocar de lugar.': 'Synergy: two starters from the same NFL team, on the same side and next to each other on the field get a line in the team colour. Each link adds +0.1x to the weight of both (the 1.0x RB linked to the QB becomes 1.1x, and the 2.5x QB becomes 2.6x), and that extra weight turns into OVR points, up to +4 per side. You choose where each player lines up: tap a player, then another spot of the same position to swap.'
 });
+Object.assign(I18N.en, {
+  '20 jogadores por time: 16 titulares e 4 reservas de qualquer posição, com formações.': '20 players per team: 16 starters and 4 reserves of any position, with formations.',
+  'livre': 'free',
+  'qualquer posição': 'any position',
+  'RES': 'RES',
+  'FORMAÇÕES · modo com reservas': 'FORMATIONS · reserves mode',
+  'Cada formação muda o peso das posições: o foco sobe e o resto perde importância relativa, porque o OVR continua sendo uma média. Os 4 reservas são livres, de qualquer posição, e é neles que você guarda o WR, CB ou LB extra da formação que quer usar. Se faltar jogador pra formação escolhida, o jogo usa a melhor que der.': 'Each formation changes the weight of the positions: the focus goes up and everything else loses relative importance, since OVR is still an average. The 4 reserves are free, any position, and that is where you keep the extra WR, CB or LB for the formation you want. If you lack players for the chosen formation, the game uses the best one it can.'
+});
