@@ -519,3 +519,5 @@ Object.assign(I18N.en, {
 });
 
 Object.assign(I18N.en, {'DIAMANTE': 'DIAMOND'});
+
+Object.assign(I18N.en, {'o time': 'the team', 'Som': 'Sound', '16 vagas': '16 spots'});
