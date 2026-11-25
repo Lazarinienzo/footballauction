@@ -291,6 +291,8 @@ button.seat.dash:active{background:var(--panel)}
 .bopt .bt b{display:block;font-size:15px}.bopt .bt small{display:block;color:var(--mute);font-size:12px;margin-top:2px}
 .fmb{display:flex;gap:6px;margin:2px 0 8px;flex-wrap:wrap}
 .fmb button{border:1px solid var(--line);background:var(--panel);color:var(--mute);border-radius:99px;padding:5px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.fmb button.dis{opacity:.4}
+.tm .ft{display:block;font-size:10px;font-weight:700;color:var(--hi);min-height:0;margin:-2px 0 4px}.tm .ft:empty{display:none}
 .fmb button.on{background:var(--flag);border-color:var(--flag);color:#10151f}
 .fld.bnc .bg{display:grid;grid-template-columns:repeat(5,1fr);gap:6px 4px;padding:6px 2px 10px}
 .fld.bnc .tk{position:relative;transform:none;left:auto;top:auto;width:auto}
@@ -942,7 +944,7 @@ html,body{overflow-x:hidden}
     <div><b>6</b><span>posses por jogo</span></div>
   </div>
 
-  <button type="button" class="bopt" id="lb-bench" aria-pressed="false"><span class="sw"><i></i></span><span class="bt"><b>Reservas e formações</b><small id="lb-bench-s"></small></span></button>
+  <button type="button" class="bopt" id="lb-bench" aria-pressed="false"><span class="sw"><i></i></span><span class="bt"><b>Reservas</b><small id="lb-bench-s"></small></span></button>
 
   <button class="btn full" id="lb-go" style="margin-top:16px">Abrir o leilão</button>
   <p class="note" id="lb-note" style="margin-top:12px;text-align:center"></p>

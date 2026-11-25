@@ -317,7 +317,7 @@ const benchOn = () => !!(L.mp ? MP.lobby && MP.lobby.bench : L.bench);
 function paintBenchOpt() {
   const on = benchOn(), host = !L.mp || mpIsHost(), b = $('#lb-bench');
   b.classList.toggle('on', on); b.disabled = !host; b.setAttribute('aria-pressed', on);
-  $('#lb-bench-s').textContent = on ? t('20 jogadores por time: 16 titulares e 4 reservas de qualquer posição, com formações.') : t('16 titulares por time, formação padrão.');
+  $('#lb-bench-s').textContent = on ? t('20 jogadores por time: 16 titulares e 4 reservas de qualquer posição.') : t('16 titulares por time, sem reservas.');
   const r = document.querySelector('#lobby .rules div:nth-child(2)');
   if (r) { r.querySelector('b').textContent = on ? BENCH_TOTAL : TOTAL_SLOTS; r.querySelector('span').textContent = on ? t('jogadores (16 + 4 reservas)') : t('titulares'); }
 }
@@ -440,10 +440,10 @@ function lineupRows(roster, order, form) {
 const benchOf = (roster, ord) => { const used = new Set(Object.values(ord || {}).flat()); return roster.filter(p => !used.has(p.id)).sort((a, b) => POS_ORDER.indexOf(a.pos) - POS_ORDER.indexOf(b.pos) || b.ovr - a.ovr); };
 // vagas de cada posição pro Mesa (todas as vagas do elenco, titulares e reservas)
 // Mesa: as 16 vagas obrigatórias (mínimo de cada posição) + as reservas livres, que mostram a posição de quem entrou
-const chipRows = (roster, total) => {
-  const by = pos => roster.filter(p => p.pos === pos).sort((a, b) => b.ovr - a.ovr);
-  const rows = POS_ORDER.flatMap(pos => Array.from({ length: SLOTS[pos] }, (_, i) => ({ pos, p: by(pos)[i] || null })));
-  const ex = POS_ORDER.flatMap(pos => by(pos).slice(SLOTS[pos]));
+const chipRows = (roster, total, form) => {
+  const by = pos => roster.filter(p => p.pos === pos).sort((a, b) => b.ovr - a.ovr), fs = formSlots(form);
+  const rows = POS_ORDER.flatMap(pos => Array.from({ length: fs[pos] }, (_, i) => ({ pos, p: by(pos)[i] || null })));
+  const ex = POS_ORDER.flatMap(pos => by(pos).slice(fs[pos]));
   for (let k = 0; k < (total || TOTAL_SLOTS) - TOTAL_SLOTS; k++) rows.push({ pos: ex[k] ? ex[k].pos : 'RES', p: ex[k] || null, res: true });
   return rows;
 };
@@ -597,7 +597,7 @@ function fieldHTML(side, rows, o) {
   });
   const got = rows.filter(r => r.p).length;
   const sy = o.syn && o.syn[side] ? `<span class="sy">${t('Sinergia')} +${nf(o.syn[side].toFixed(1))}</span>` : '', up = o.up && o.up[side] ? `<span class="sy up">${t('Esse lote liga com seu time')} +${nf(o.up[side].toFixed(1))}</span>` : '';
-  const fb = o.bench ? `<div class="fmb">${Object.keys(FORMS[side]).map(f => `<button type="button" class="${form[side] === f ? 'on' : ''}" data-side="${side}" data-f="${f}">${t(FORM_LABEL[side][f])}</button>`).join('')}</div>` : '';
+  const fb = `<div class="fmb">${Object.keys(FORMS[side]).map(f => `<button type="button" class="${form[side] === f ? 'on' : ''}${o.can && !o.can({ ...form, [side]: f }) ? ' dis' : ''}" data-side="${side}" data-f="${f}">${t(FORM_LABEL[side][f])}</button>`).join('')}</div>`;
   return `<div class="fld"><div class="fh"><span>${t(side === 'off' ? 'ATAQUE' : 'DEFESA')} ${sy}</span>${up}<span class="num">${got}/8</span></div>${fb}<div class="fg" style="--rows:${rowsN}">${cells.join('')}</div></div>`;
 }
 // painel de reservas: vagas livres (qualquer posição). Quem não é titular na formação atual fica aqui.
@@ -649,7 +649,7 @@ function placeIn(ord, p, sel) {
   if (i >= 0) s[i] = p.id; return ord;
 }
 function ensureOrder(M, ctx, send) {
-  M.form = validForm(M.form, M.bench);
+  M.form = validForm(M.form);
   const seen = M._ids, fresh = seen ? M.roster.filter(p => !seen.has(p.id)) : [];
   const ord = normOrder(M.roster.filter(p => !fresh.includes(p)), M.order, M.form);
   fresh.forEach(p => { placeIn(ord, p, ctx.sel); if (ctx.sel && ctx.sel.pos === p.pos && ctx.sel.bid == null) ctx.sel = null; });
@@ -662,7 +662,7 @@ const sendOrder = M => { if (G.mp && M.human) mpSend({ t: 'ord', o: M.order, f: 
 // dados de sinergia e desenho do campo de um time (usado no leilão e no Sandbox)
 function fieldData(T, ord, ctx) {
   const rows = lineupRows(T.roster, ord, T.form), L = lineup(T.roster, ord, T.form), I = { off: synInfo(L, 'off'), def: synInfo(L, 'def') }, links = { off: I.off.links, def: I.def.links };
-  const o = { sel: ctx.sel, form: T.form, bench: T.bench, linked: new Set(), syn: { off: I.off.pts, def: I.def.pts }, bw: { off: I.off.bw, def: I.def.bw } };
+  const o = { sel: ctx.sel, form: T.form, can: T.sandbox ? null : f => canForm(T, f), linked: new Set(), syn: { off: I.off.pts, def: I.def.pts }, bw: { off: I.off.bw, def: I.def.bw } };
   ['off', 'def'].forEach(sd => links[sd].forEach(l => { o.linked.add(l.a.id); o.linked.add(l.b.id); }));
   return { rows, L, I, links, o };
 }
@@ -683,20 +683,21 @@ function paintLineup() {
   $('#fm').innerHTML = fieldHTML('off', off, o) + fieldHTML('def', def, o) + (M.bench ? benchHTML(M, ord, o) : '');
   drawLinks(links);
   const sp = G.sel && (G.sel.bid != null ? M.roster.find(p => p.id === G.sel.bid) : M.roster.find(p => p.id === ord[G.sel.pos][G.sel.i]));
-  $('#fm-act').textContent = G.sel ? (sp ? t('Toque em outro {p} pra trocar {n} de lugar.', { p: G.sel.pos, n: shortName(sp.name) }) : t('Vaga selecionada: o próximo {p} que você comprar entra aqui.', { p: G.sel.pos })) : t(M.bench ? 'Toque num jogador e depois em outro da mesma posição (titular ou reserva) pra trocar. Mude a formação nos botões.' : 'Toque num jogador e depois em outra vaga da mesma posição pra mudar de lugar.');
+  $('#fm-act').textContent = G.sel ? (sp ? t('Toque em outro {p} pra trocar {n} de lugar.', { p: G.sel.pos, n: shortName(sp.name) }) : t('Vaga selecionada: o próximo {p} que você comprar entra aqui.', { p: G.sel.pos })) : t(M.bench ? 'Toque num jogador e depois em outro da mesma posição (titular ou reserva) pra trocar. Mude a formação nos botões.' : 'Toque num jogador e depois em outra vaga da mesma posição pra trocar. Mude a formação nos botões.');
   const bn = M.bench ? benchOf(M.roster, ord) : [];
   $('#lst').innerHTML = `<div class="sub" style="margin-top:0">${t('ATAQUE')}</div>${off.map(r => slotHTML(r, o)).join('')}<div class="sub">${t('DEFESA')}</div>${def.map(r => slotHTML(r, o)).join('')}` + (M.bench ? `<div class="sub">${t('RESERVAS')}</div>${bn.length ? bn.map(p => slotHTML({ pos: p.pos, p }, o)).join('') : `<p class="note">${t('Nenhum reserva ainda.')}</p>`}` : '');
 }
 $('#fm').onclick = e => {
   if (!G.A || G.A.done) return; const M = me();
   const fb = e.target.closest('.fmb [data-f]');
+  if (fb && fb.classList.contains('dis')) { $('#fm-act').textContent = t('Você já tem jogador demais numa posição que essa formação não usa. Escolha a formação cedo, antes de comprar.'); return; }
   if (fb) setForm(M, G, fb.dataset.side, fb.dataset.f);
   else { const k = e.target.closest('.tk'); if (!k) return; tapField(M, G, k); }
   paintLineup(); sendOrder(M);
 };
 
 // ---------- SANDBOX: monte o elenco sem leilão, sem dinheiro ----------
-const SB = cfgTeam({ roster: [], order: null, form: { ...STD }, human: true, pos: 'QB', q: '', sel: null }, true);
+const SB = cfgTeam({ roster: [], order: null, form: { ...STD }, human: true, sandbox: true, pos: 'QB', q: '', sel: null }, true);
 const sbPool = () => DB.map((p, i) => p.id != null ? p : (p.id = i, p));
 const sbById = id => sbPool().find(p => p.id === id);
 function sbRemove(T, id) {
@@ -764,7 +765,7 @@ $('#sb-list').onclick = e => {
 function formsInfo() {
   const fmt = x => nf(String(x).replace('.', ','));
   const line = (side, f) => `<div class="pi"><span class="pos ${side}">${t(FORM_LABEL[side][f])}</span><div><p>${Object.entries(FW[side][f]).filter(([ps]) => formSlots({ ...STD, [side]: f })[ps] > 0).sort((a, b) => b[1] - a[1]).map(([ps, w]) => `${ps} ${fmt(w)}x`).join(' · ')}</p></div></div>`;
-  return `<div class="sub">${t('FORMAÇÕES · modo com reservas')}</div><p class="sh-n">${t('Cada formação muda o peso das posições: o foco sobe e o resto perde importância relativa, porque o OVR continua sendo uma média. Os 4 reservas são livres, de qualquer posição, e é neles que você guarda o WR, CB ou LB extra da formação que quer usar. Se faltar jogador pra formação escolhida, o jogo usa a melhor que der.')}</p>` + ['off', 'def'].map(sd => Object.keys(FORMS[sd]).map(f => line(sd, f)).join('')).join('');
+  return `<div class="sub">${t('FORMAÇÕES')}</div><p class="sh-n">${t('Em qualquer modo você escolhe a formação, e ela define quantos jogadores de cada posição você precisa. Cada formação muda o peso das posições: o foco sobe e o resto perde importância relativa, porque o OVR continua sendo uma média. Dá pra trocar enquanto o elenco couber na formação nova, então escolha cedo, antes de comprar. No modo com reservas, os 4 reservas são livres, de qualquer posição.')}</p>` + ['off', 'def'].map(sd => Object.keys(FORMS[sd]).map(f => line(sd, f)).join('')).join('');
 }
 function openPosInfo() {
   const row = s => ([p, n, q, d]) => `<div class="pi"><span class="pos ${s}">${p}</span><div><b>${n}<em>${tpl('{n} vaga', '{n} vagas', q)} · ${nf(WEIGHT[p].toFixed(2).replace(/0$/, ''))}x</em></b><p>${t(d)}</p></div></div>`;
@@ -784,11 +785,11 @@ function paintLists() {
     : `<div class="sale"><b>${esc(s.player.name)}</b> <em>${s.player.pos} · ${s.player.ovr} · ${esc(frName(s.player))}</em><br><em>${s.note === 'fica pro sorteio' ? t('você passou: o jogo completa seu time no fim') : t('ninguém quis, volta depois')}</em></div>`).join('') : '<p class="note">' + t('Nenhuma venda ainda.') + '</p>';
 }
 function tableHTML() {
-  return G.teams.map(t => `<div class="tm" data-t="${t.id}" role="button" tabindex="0"><div class="th">${badge(t.emb, 22)}<span class="tn">${esc(t.name)}${t.human ? ' (' + tt('você') + ')' : ''}</span></div><div class="tb2"><b class="num tb"></b><span class="tc num"></span></div><div class="tp${t.bench ? ' b20' : ''}"></div><span class="bb"><i></i></span></div>`).join('');
+  return G.teams.map(t => `<div class="tm" data-t="${t.id}" role="button" tabindex="0"><div class="th">${badge(t.emb, 22)}<span class="tn">${esc(t.name)}${t.human ? ' (' + tt('você') + ')' : ''}</span></div><small class="ft"></small><div class="tb2"><b class="num tb"></b><span class="tc num"></span></div><div class="tp${t.bench ? ' b20' : ''}"></div><span class="bb"><i></i></span></div>`).join('');
 }
 // mini-campo: 4 colunas x 4 linhas (ataque em cima, defesa embaixo). Cheio = comprado, tracejado = vaga aberta
 function chipsHTML(T, cur) {
-  return chipRows(T.roster, T.total).map(r => `<span class="ch ${r.pos === 'RES' ? 'res' : OFF_POS.includes(r.pos) ? 'off' : 'def'}${r.p ? '' : ' empty'}${!r.p && cur && (r.res ? need(T, cur.pos) > 0 : cur.pos === r.pos) ? ' want' : ''}">${r.pos === 'RES' ? t('RES') : r.pos}</span>`).join('');
+  return chipRows(T.roster, T.total, T.form).map(r => `<span class="ch ${r.pos === 'RES' ? 'res' : OFF_POS.includes(r.pos) ? 'off' : 'def'}${r.p ? '' : ' empty'}${!r.p && cur && (r.res ? need(T, cur.pos) > 0 : cur.pos === r.pos) ? ' want' : ''}">${r.pos === 'RES' ? t('RES') : r.pos}</span>`).join('');
 }
 function paintTable() {
   const A = G.A, cards = document.querySelectorAll('#table .tm'), cur = A.phase === 'bidding' ? A.cur : null;
@@ -800,7 +801,9 @@ function paintTable() {
     tween(r.querySelector('.tb'), t.budget, dollars);
     setText(r.querySelector('.tc'), `${t.roster.length}/${t.total || TOTAL_SLOTS}`);
     r.querySelector('.bb i').style.width = Math.max(0, Math.min(100, t.budget / BUDGET * 100)) + '%';
-    const key = t.roster.map(p => p.id).join(',') + '|' + (cur ? cur.pos : '') + '|' + (cur ? need(t, cur.pos) : '');
+    const key = t.roster.map(p => p.id).join(',') + '|' + (cur ? cur.pos : '') + '|' + (cur ? need(t, cur.pos) : '') + '|' + JSON.stringify(t.form);
+    const ft = t.form && (t.form.off !== 'std' || t.form.def !== 'std') ? [t.form.off, t.form.def].filter(f => f !== 'std').map(f => FORM_LABEL.off[f] || FORM_LABEL.def[f]).map(x => tt(x)).join(' · ') : '';
+    setText(r.querySelector('.ft'), ft);
     if (r.dataset.k !== key) { r.dataset.k = key; r.querySelector('.tp').innerHTML = chipsHTML(t, cur); }
   });
   if (!$('#tview').hidden) tvPaint(false);
@@ -814,7 +817,8 @@ function tvPaint(force) {
   const ord = T.human || T.order ? T.order : null, form = T.form || STD, rows = lineupRows(T.roster, ord, form), off = rows.filter(r => OFF_POS.includes(r.pos)), def = rows.filter(r => !OFF_POS.includes(r.pos));
   const bn = T.bench ? benchOf(T.roster, ord ? normOrder(T.roster, ord, form) : Object.fromEntries(POS_ORDER.map(ps => [ps, rows.filter(r => r.pos === ps).map(r => r.p && r.p.id)]))) : [];
   $('#tv-h').textContent = T.name + (T.human ? ' (' + tt('você') + ')' : '');
-  const st = T.bench ? tt('{n}/20 jogadores · {f} · sobram {b}', { n: T.roster.length, f: T.form ? tt(FORM_LABEL.off[T.form.off]) + ' / ' + tt(FORM_LABEL.def[T.form.def]) : tt('Padrão'), b: dollars(T.budget) }) : tt('{n}/16 titulares · sobram {b}', { n: T.roster.length, b: dollars(T.budget) });
+  const fl = T.form ? tt(FORM_LABEL.off[T.form.off]) + ' / ' + tt(FORM_LABEL.def[T.form.def]) : tt('Padrão');
+  const st = T.bench ? tt('{n}/20 jogadores · {f} · sobram {b}', { n: T.roster.length, f: fl, b: dollars(T.budget) }) : tt('{n}/16 titulares · {f} · sobram {b}', { n: T.roster.length, f: fl, b: dollars(T.budget) });
   $('#tv-b').innerHTML = `<div class="tvh">${badge(T.emb, 40)}<small>${esc(st)}</small></div><div class="lu"><div><div class="sub" style="margin-top:0">${tt('ATAQUE')}</div>${off.map(r => slotHTML(r)).join('')}</div><div><div class="sub">${tt('DEFESA')}</div>${def.map(r => slotHTML(r)).join('')}</div></div>` + (T.bench ? `<div class="sub">${tt('RESERVAS')}</div>${bn.length ? bn.map(p => slotHTML({ pos: p.pos, p })).join('') : `<p class="note">${tt('Nenhum reserva ainda.')}</p>`}` : '');
 }
 function tvOpen(id) { TV.id = id; TV.key = ''; tvPaint(true); $('#tview').hidden = false; $('#tv-b').scrollTop = 0; }
@@ -855,7 +859,7 @@ document.addEventListener('keydown', e => {
 // ----- resultados -----
 function teamLineupHTML(t) {
   const rows = lineupRows(t.roster, t.order, t.form), off = rows.filter(r => OFF_POS.includes(r.pos)), def = rows.filter(r => !OFF_POS.includes(r.pos));
-  return `<div class="lu"><div><div class="sub" style="margin-top:0">${tt('ATAQUE')} · ${t.rt.off.toFixed(1)}</div>${off.map((r, i) => slotHTML(r, { i })).join('')}</div><div><div class="sub">${tt('DEFESA')} · ${t.rt.def.toFixed(1)}</div>${def.map((r, i) => slotHTML(r, { i: i + off.length })).join('')}</div></div>` + (t.bench && t.order ? (bn => bn.length ? `<div class="sub">${tt('RESERVAS')}</div><div class="lu"><div>${bn.map(p => slotHTML({ pos: p.pos, p })).join('')}</div></div>` : '')(benchOf(t.roster, normOrder(t.roster, t.order, t.form))) : '') + (t.bench && t.form && (t.form.off !== 'std' || t.form.def !== 'std') ? `<p class="note" style="margin-top:8px">${tt('Formação')}: ${tt(FORM_LABEL.off[t.form.off])} / ${tt(FORM_LABEL.def[t.form.def])}</p>` : '');
+  return `<div class="lu"><div><div class="sub" style="margin-top:0">${tt('ATAQUE')} · ${t.rt.off.toFixed(1)}</div>${off.map((r, i) => slotHTML(r, { i })).join('')}</div><div><div class="sub">${tt('DEFESA')} · ${t.rt.def.toFixed(1)}</div>${def.map((r, i) => slotHTML(r, { i: i + off.length })).join('')}</div></div>` + (t.bench && t.order ? (bn => bn.length ? `<div class="sub">${tt('RESERVAS')}</div><div class="lu"><div>${bn.map(p => slotHTML({ pos: p.pos, p })).join('')}</div></div>` : '')(benchOf(t.roster, normOrder(t.roster, t.order, t.form))) : '') + (t.form && (t.form.off !== 'std' || t.form.def !== 'std') ? `<p class="note" style="margin-top:8px">${tt('Formação')}: ${tt(FORM_LABEL.off[t.form.off])} / ${tt(FORM_LABEL.def[t.form.def])}</p>` : '');
 }
 function showResults() {
   G.teams.forEach(finishTeam);

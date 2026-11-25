@@ -414,3 +414,13 @@ Object.assign(I18N.en, {
   'FORMAÇÕES · modo com reservas': 'FORMATIONS · reserves mode',
   'Cada formação muda o peso das posições: o foco sobe e o resto perde importância relativa, porque o OVR continua sendo uma média. Os 4 reservas são livres, de qualquer posição, e é neles que você guarda o WR, CB ou LB extra da formação que quer usar. Se faltar jogador pra formação escolhida, o jogo usa a melhor que der.': 'Each formation changes the weight of the positions: the focus goes up and everything else loses relative importance, since OVR is still an average. The 4 reserves are free, any position, and that is where you keep the extra WR, CB or LB for the formation you want. If you lack players for the chosen formation, the game uses the best one it can.'
 });
+Object.assign(I18N.en, {
+  'Reservas': 'Bench',
+  '20 jogadores por time: 16 titulares e 4 reservas de qualquer posição.': '20 players per team: 16 starters and 4 reserves of any position.',
+  '16 titulares por time, sem reservas.': '16 starters per team, no reserves.',
+  'Você já tem jogador demais numa posição que essa formação não usa. Escolha a formação cedo, antes de comprar.': 'You already have too many players at a position this formation does not use. Pick your formation early, before buying.',
+  'Toque num jogador e depois em outra vaga da mesma posição pra trocar. Mude a formação nos botões.': 'Tap a player, then another spot of the same position to swap. Change the formation with the buttons.',
+  '{n}/16 titulares · {f} · sobram {b}': '{n}/16 starters · {f} · {b} left',
+  'FORMAÇÕES': 'FORMATIONS',
+  'Em qualquer modo você escolhe a formação, e ela define quantos jogadores de cada posição você precisa. Cada formação muda o peso das posições: o foco sobe e o resto perde importância relativa, porque o OVR continua sendo uma média. Dá pra trocar enquanto o elenco couber na formação nova, então escolha cedo, antes de comprar. No modo com reservas, os 4 reservas são livres, de qualquer posição.': 'In any mode you pick the formation, and it sets how many players you need at each position. Each formation changes the position weights: the focus goes up and the rest lose relative importance, since OVR is still an average. You can switch while your roster still fits the new formation, so pick early, before buying. In reserves mode, the 4 reserves are free, any position.'
+});

@@ -135,7 +135,7 @@ function normOrder(roster, order, form) {
   }
   return out;
 }
-const validForm = (f, bench) => { const o = {}; for (const sd of ['off', 'def']) o[sd] = bench && f && FORMS[sd][f[sd]] ? f[sd] : 'std'; return o; };
+const validForm = f => { const o = {}; for (const sd of ['off', 'def']) o[sd] = f && FORMS[sd][f[sd]] ? f[sd] : 'std'; return o; };   // formações valem em todos os modos
 // a formação do lado só dá pra montar se o elenco tem jogadores de sobra em cada posição dela
 const feasible = (roster, side, f) => { const fs = formSlots({ ...STD, [side]: f }); return [...new Set(SPOT[side][f].map(q => q[0]))].every(pos => roster.filter(p => p.pos === pos).length >= fs[pos]); };
 const kperms = (a, k) => k <= 0 ? [[]] : a.length === 0 ? [Array(k).fill(null)] : a.flatMap((x, i) => kperms(a.filter((_, j) => j !== i), k - 1).map(r => [x, ...r]));
@@ -144,7 +144,7 @@ function autoPlan(roster, bench) {
   const form = { ...STD }; let order = normOrder(roster, null, form);
   for (const side of ['off', 'def']) {
     let best = null;
-    for (const f of bench ? Object.keys(FORMS[side]) : ['std']) {
+    for (const f of Object.keys(FORMS[side])) {
       if (f !== 'std' && !feasible(roster, side, f)) continue;
       const fm = { ...form, [side]: f }, base = normOrder(roster, order, fm), fs = formSlots(fm);
       const poss = [...new Set(SPOT[side][f].map(q => q[0]))], pools = poss.map(pos => kperms(roster.filter(x => x.pos === pos).map(x => x.id), fs[pos]));
@@ -217,12 +217,16 @@ function simGame(tA, tB, opts) {
 const POSW = { QB: 1.6, RB: 1.0, WR: 1.15, TE: 1.0, OL: 1.05, EDGE: 1.3, DT: 1.0, LB: 1.0, CB: 1.15 };
 const slotsLeft = t => (t.total || TOTAL_SLOTS) - t.roster.length;
 // vagas obrigatórias que faltam na posição (o mínimo é a formação padrão) e reservas livres (qualquer posição) que ainda restam
-const mand = (t, pos) => Math.max(0, SLOTS[pos] - t.roster.filter(p => p.pos === pos).length);
+// A formação do time define quantos titulares de cada posição ele precisa; o modo com reservas soma 4 vagas livres por cima.
+const mand = (t, pos) => Math.max(0, formSlots(t.form)[pos] - t.roster.filter(p => p.pos === pos).length);
 const freeSlots = t => Math.max(0, slotsLeft(t) - POS_ORDER.reduce((n, pos) => n + mand(t, pos), 0));
 const need = (t, pos) => mand(t, pos) + freeSlots(t);
+// dá pra trocar pra formação f? Só se o elenco ainda couber nela e der pra completar as vagas que faltam
+const canForm = (t, f) => { const fs = formSlots(f); return POS_ORDER.reduce((n, pos) => n + Math.max(0, fs[pos] - t.roster.filter(p => p.pos === pos).length), 0) <= slotsLeft(t); };
 const maxBid = (t, p) => need(t, p.pos) <= 0 ? 0 : Math.max(0, t.budget - (slotsLeft(t) - 1));
 
-const posNeed = (pos, n, free) => SLOTS[pos] * n + Math.ceil((free || 0) * n / POS_ORDER.length);   // reservas livres: espalha a demanda por todas as posições
+const FMAX = POS_ORDER.reduce((o, pos) => (o[pos] = Math.max(...[...Object.values(FORMS.off), ...Object.values(FORMS.def)].map(f => f[pos] != null ? f[pos] : SLOTS[pos])), o), {});
+const posNeed = (pos, n, free) => Math.ceil((SLOTS[pos] + (FMAX[pos] - SLOTS[pos]) / 2) * n) + Math.ceil((free || 0) * n / POS_ORDER.length);   // sobra pra quem escolher formação com mais jogadores na posição   // reservas livres: espalha a demanda por todas as posições
 function maxTeams(db, free) {
   const c = {}; db.forEach(p => c[p.pos] = (c[p.pos] || 0) + 1);
   return Math.min(...POS_ORDER.map(pos => { let n = 0; while (posNeed(pos, n + 1, free) <= (c[pos] || 0)) n++; return n; }));
@@ -239,7 +243,10 @@ function makePool(db, n, extra, free) {
 }
 function newBot(id, name, bench) {
   const pos = {}; POS_ORDER.forEach(p => pos[p] = .8 + R() * .45);
-  return cfgTeam({ id, name, human: false, budget: BUDGET, roster: [], persona: { aggr: .85 + R() * .35, pos } }, bench);
+  const t = cfgTeam({ id, name, human: false, budget: BUDGET, roster: [], persona: { aggr: .85 + R() * .35, pos } }, bench);
+  const pick = sd => R() < .6 ? 'std' : Object.keys(FORMS[sd]).filter(f => f !== 'std')[rint(0, 1)];
+  t.form = { off: pick('off'), def: pick('def') };      // bot escolhe a formação desde o começo (é pública)
+  return t;
 }
 
 class Auction {
@@ -517,4 +524,4 @@ function simSeason(teams, confs) {
 }
 
 
-export { DB, SLOTS, POS_ORDER, OFF_POS, TOTAL_SLOTS, BUDGET, FORMS, BENCH_TOTAL, Auction, newBot, cfgTeam, validForm, maxTeams, feasible, finishTeam, withSeed, rint, R, maxBid, need, slotsLeft, MIN_TEAMS };
+export { DB, SLOTS, POS_ORDER, OFF_POS, TOTAL_SLOTS, BUDGET, FORMS, BENCH_TOTAL, Auction, newBot, cfgTeam, validForm, maxTeams, feasible, canForm, finishTeam, withSeed, rint, R, maxBid, need, slotsLeft, MIN_TEAMS };
