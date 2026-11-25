@@ -344,6 +344,21 @@ $('#lb-go').onclick = () => {
   cancelAnimationFrame(G.raf); G.last = performance.now(); G.raf = requestAnimationFrame(frame);
 };
 
+// ----- tema claro / escuro (escuro é o padrão: azul-marinho) -----
+function themeSync() {
+  const lt = document.documentElement.dataset.theme === 'light';
+  document.querySelectorAll('[data-theme-toggle]').forEach(b => { const l = t(lt ? 'Tema escuro' : 'Tema claro'); b.setAttribute('aria-label', l); b.title = l; });
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = lt ? '#f4eee3' : '#050d26';
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('[data-theme-toggle]')) return;
+  const lt = document.documentElement.dataset.theme === 'light';
+  if (lt) delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = 'light';
+  try { localStorage.setItem('fa-theme', lt ? 'dark' : 'light'); } catch (x) { }
+  themeSync();
+});
+themeSync();
+
 // ----- sons (WebAudio, sem arquivos): "up" curtinho a cada lance -----
 const sfx = {
   on: (() => { try { return localStorage.getItem('fa-snd') !== '0'; } catch (e) { return true; } })(), ctx: null,
@@ -1063,7 +1078,7 @@ function relang(from) {
 function setLang(l) {
   if (!LANGS.includes(l) || l === LANG) return;
   const from = LANG; LANG = l; try { localStorage.setItem('fa-lang', l); } catch (e) {}
-  relang(from);
+  relang(from); themeSync();
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-lang]'); if (b) setLang(b.dataset.lang); });
 /*MPCLIENT*/
