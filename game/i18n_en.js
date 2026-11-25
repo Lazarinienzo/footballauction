@@ -424,3 +424,14 @@ Object.assign(I18N.en, {
   'FORMAÇÕES': 'FORMATIONS',
   'Em qualquer modo você escolhe a formação, e ela define quantos jogadores de cada posição você precisa. Cada formação muda o peso das posições: o foco sobe e o resto perde importância relativa, porque o OVR continua sendo uma média. Dá pra trocar enquanto o elenco couber na formação nova, então escolha cedo, antes de comprar. No modo com reservas, os 4 reservas são livres, de qualquer posição.': 'In any mode you pick the formation, and it sets how many players you need at each position. Each formation changes the position weights: the focus goes up and the rest lose relative importance, since OVR is still an average. You can switch while your roster still fits the new formation, so pick early, before buying. In reserves mode, the 4 reserves are free, any position.'
 });
+Object.assign(I18N.en, {
+  '1 RB, 1 TE e 2 WR. O equilíbrio entre corrida e passe.': '1 RB, 1 TE and 2 WR. The balance between run and pass.',
+  '3 WR e nenhum TE. O passe manda: QB e WR valem mais.': '3 WR and no TE. The pass rules: QB and WR count more.',
+  '2 TE e só 1 WR. Jogo corrido e de bloqueio.': '2 TE and just 1 WR. Run and blocking game.',
+  '4 OL, 1 WR, 1 TE e 1 RB. Linha extra: a corrida manda.': '4 OL, 1 WR, 1 TE and 1 RB. Extra lineman: the run rules.',
+  '2 EDGE, 2 DT, 2 LB e 2 CB. A defesa equilibrada.': '2 EDGE, 2 DT, 2 LB and 2 CB. The balanced defense.',
+  '3 CB e só 1 LB. A secundária ganha peso.': '3 CB and just 1 LB. The secondary counts more.',
+  '3 LB e só 1 DT. O meio da defesa manda.': '3 LB and just 1 DT. The middle of the defense rules.',
+  '4 CB. Anti-passe total, com a corrida exposta.': '4 CB. All-out pass defense, with the run exposed.',
+  '4 EDGE. Pressão máxima no QB.': '4 EDGE. Maximum pressure on the QB.'
+});

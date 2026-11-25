@@ -447,7 +447,10 @@ const chipRows = (roster, total, form) => {
   for (let k = 0; k < (total || TOTAL_SLOTS) - TOTAL_SLOTS; k++) rows.push({ pos: ex[k] ? ex[k].pos : 'RES', p: ex[k] || null, res: true });
   return rows;
 };
-const FORM_LABEL = { off: { std: 'Padrão', w3: '3 WR', te2: '2 TE' }, def: { std: 'Padrão', cb3: '3 CB', lb3: '3 LB' } };
+// nomes de verdade do futebol americano
+const FORM_LABEL = { off: { std: 'Singleback', w3: 'Trips', te2: 'Double TE', jb: 'Jumbo' }, def: { std: 'Base', cb3: 'Nickel', lb3: '3-4', dime: 'Dime', blz: 'Blitz' } };
+const FORM_DESC = { std: '1 RB, 1 TE e 2 WR. O equilíbrio entre corrida e passe.', w3: '3 WR e nenhum TE. O passe manda: QB e WR valem mais.', te2: '2 TE e só 1 WR. Jogo corrido e de bloqueio.', jb: '4 OL, 1 WR, 1 TE e 1 RB. Linha extra: a corrida manda.',
+  bs: '2 EDGE, 2 DT, 2 LB e 2 CB. A defesa equilibrada.', cb3: '3 CB e só 1 LB. A secundária ganha peso.', lb3: '3 LB e só 1 DT. O meio da defesa manda.', dime: '4 CB. Anti-passe total, com a corrida exposta.', blz: '4 EDGE. Pressão máxima no QB.' };
 function slotHTML(r, o) {
   o = o || {};
   const side = OFF_POS.includes(r.pos) ? 'off' : 'def';
@@ -764,7 +767,7 @@ $('#sb-list').onclick = e => {
 // pesos de cada posição em cada formação (só no modo com reservas)
 function formsInfo() {
   const fmt = x => nf(String(x).replace('.', ','));
-  const line = (side, f) => `<div class="pi"><span class="pos ${side}">${t(FORM_LABEL[side][f])}</span><div><p>${Object.entries(FW[side][f]).filter(([ps]) => formSlots({ ...STD, [side]: f })[ps] > 0).sort((a, b) => b[1] - a[1]).map(([ps, w]) => `${ps} ${fmt(w)}x`).join(' · ')}</p></div></div>`;
+  const line = (side, f) => `<div class="pi"><span class="pos ${side}">${t(FORM_LABEL[side][f])}</span><div><p>${t(FORM_DESC[side === 'def' && f === 'std' ? 'bs' : f])}</p><p>${Object.entries(FW[side][f]).filter(([ps]) => formSlots({ ...STD, [side]: f })[ps] > 0).sort((a, b) => b[1] - a[1]).map(([ps, w]) => `${ps} ${fmt(w)}x`).join(' · ')}</p></div></div>`;
   return `<div class="sub">${t('FORMAÇÕES')}</div><p class="sh-n">${t('Em qualquer modo você escolhe a formação, e ela define quantos jogadores de cada posição você precisa. Cada formação muda o peso das posições: o foco sobe e o resto perde importância relativa, porque o OVR continua sendo uma média. Dá pra trocar enquanto o elenco couber na formação nova, então escolha cedo, antes de comprar. No modo com reservas, os 4 reservas são livres, de qualquer posição.')}</p>` + ['off', 'def'].map(sd => Object.keys(FORMS[sd]).map(f => line(sd, f)).join('')).join('');
 }
 function openPosInfo() {
@@ -817,7 +820,7 @@ function tvPaint(force) {
   const ord = T.human || T.order ? T.order : null, form = T.form || STD, rows = lineupRows(T.roster, ord, form), off = rows.filter(r => OFF_POS.includes(r.pos)), def = rows.filter(r => !OFF_POS.includes(r.pos));
   const bn = T.bench ? benchOf(T.roster, ord ? normOrder(T.roster, ord, form) : Object.fromEntries(POS_ORDER.map(ps => [ps, rows.filter(r => r.pos === ps).map(r => r.p && r.p.id)]))) : [];
   $('#tv-h').textContent = T.name + (T.human ? ' (' + tt('você') + ')' : '');
-  const fl = T.form ? tt(FORM_LABEL.off[T.form.off]) + ' / ' + tt(FORM_LABEL.def[T.form.def]) : tt('Padrão');
+  const fl = T.form ? tt(FORM_LABEL.off[T.form.off]) + ' / ' + tt(FORM_LABEL.def[T.form.def]) : tt('Singleback') + ' / ' + tt('Base');
   const st = T.bench ? tt('{n}/20 jogadores · {f} · sobram {b}', { n: T.roster.length, f: fl, b: dollars(T.budget) }) : tt('{n}/16 titulares · {f} · sobram {b}', { n: T.roster.length, f: fl, b: dollars(T.budget) });
   $('#tv-b').innerHTML = `<div class="tvh">${badge(T.emb, 40)}<small>${esc(st)}</small></div><div class="lu"><div><div class="sub" style="margin-top:0">${tt('ATAQUE')}</div>${off.map(r => slotHTML(r)).join('')}</div><div><div class="sub">${tt('DEFESA')}</div>${def.map(r => slotHTML(r)).join('')}</div></div>` + (T.bench ? `<div class="sub">${tt('RESERVAS')}</div>${bn.length ? bn.map(p => slotHTML({ pos: p.pos, p })).join('') : `<p class="note">${tt('Nenhum reserva ainda.')}</p>`}` : '');
 }

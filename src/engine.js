@@ -26,8 +26,9 @@ const TOTAL_SLOTS = 16, BUDGET = 200;
 const BENCH_TOTAL = 20;
 // Formações (só no modo com reservas): quantos titulares cada posição tem. Padrão = a do jogo clássico.
 const FORMS = {
-  off: { std: { WR: 2, TE: 1 }, w3: { WR: 3, TE: 0 }, te2: { WR: 1, TE: 2 } },
-  def: { std: { DT: 2, LB: 2, CB: 2 }, cb3: { DT: 2, LB: 1, CB: 3 }, lb3: { DT: 1, LB: 3, CB: 2 } }
+  // ataque: std = Singleback, w3 = Trips, te2 = Double TE, jb = Jumbo (4 OL). defesa: std = Base, cb3 = Nickel, lb3 = 3-4, dime = Dime (4 CB), blz = Blitz (4 EDGE)
+  off: { std: { WR: 2, TE: 1 }, w3: { WR: 3, TE: 0 }, te2: { WR: 1, TE: 2 }, jb: { OL: 4, WR: 1, TE: 1 } },
+  def: { std: { DT: 2, LB: 2, CB: 2 }, cb3: { DT: 2, LB: 1, CB: 3 }, lb3: { DT: 1, LB: 3, CB: 2 }, dime: { DT: 1, LB: 1, CB: 4 }, blz: { EDGE: 4, DT: 1, LB: 1, CB: 2 } }
 };
 const STD = { off: 'std', def: 'std' };
 const formSlots = f => ({ QB: 1, RB: 1, OL: 3, EDGE: 2, ...FORMS.off[(f || STD).off], ...FORMS.def[(f || STD).def] });
@@ -65,12 +66,15 @@ const FW = {
   off: {
     std: { QB: 2.5, RB: 1, WR: 1.5, TE: 1, OL: 1 },
     w3: { QB: 3.5, RB: 1, WR: 2.5, TE: 1, OL: 1 },      // 3 WR, sem TE: passe manda, linha e RB ficam em segundo plano
-    te2: { QB: 2, RB: 2.5, WR: 1.5, TE: 2, OL: 2 }      // 2 TE: jogo corrido e de bloqueio, o QB e o único WR perdem peso relativo
+    te2: { QB: 2, RB: 2.5, WR: 1.5, TE: 2, OL: 2 },     // 2 TE: jogo corrido e de bloqueio, o QB e o único WR perdem peso relativo
+    jb: { QB: 2, RB: 1.5, WR: 1, TE: 1.5, OL: 1 }       // Jumbo (4 OL): são 4 jogadores na linha, então ela pesa mais no total sem subir o peso de cada um
   },
   def: {
     std: { EDGE: 2, DT: 1, LB: 1.5, CB: 1.5 },
     cb3: { EDGE: 2, DT: 1, LB: 1, CB: 2.5 },            // 3 CB, 1 LB: a secundária manda
-    lb3: { EDGE: 2, DT: 1, LB: 2.5, CB: 1 }           // 3 LB, 1 DT: o meio manda
+    lb3: { EDGE: 2, DT: 1, LB: 2.5, CB: 1 },          // 3 LB, 1 DT: o meio manda
+    dime: { EDGE: 2, DT: 1, LB: 1, CB: 2.5 },         // 4 CB: anti-passe total
+    blz: { EDGE: 1.5, DT: 1, LB: 1, CB: 1.5 }          // 4 EDGE: pressão máxima (4 jogadores de 1,5x)
   }
 };
 const wOf = (side, f, pos) => FW[side][f][pos];
@@ -80,12 +84,15 @@ const SPOT = {
   off: {
     std: [['OL', 0, 1.5, 0], ['OL', 1, 2.5, 0], ['OL', 2, 3.5, 0], ['TE', 0, 4.5, 0], ['WR', 0, 1, 1], ['QB', 0, 2.5, 1], ['WR', 1, 4, 1], ['RB', 0, 2.5, 2]],
     w3: [['OL', 0, 1.5, 0], ['OL', 1, 2.5, 0], ['OL', 2, 3.5, 0], ['WR', 2, 4.5, 0], ['WR', 0, 1, 1], ['QB', 0, 2.5, 1], ['WR', 1, 4, 1], ['RB', 0, 2.5, 2]],
-    te2: [['TE', 1, 0.5, 0], ['OL', 0, 1.5, 0], ['OL', 1, 2.5, 0], ['OL', 2, 3.5, 0], ['TE', 0, 4.5, 0], ['WR', 0, 1, 1], ['QB', 0, 2.5, 1], ['RB', 0, 2.5, 2]]
+    te2: [['TE', 1, 0.5, 0], ['OL', 0, 1.5, 0], ['OL', 1, 2.5, 0], ['OL', 2, 3.5, 0], ['TE', 0, 4.5, 0], ['WR', 0, 1, 1], ['QB', 0, 2.5, 1], ['RB', 0, 2.5, 2]],
+    jb: [['TE', 0, 0.5, 0], ['OL', 0, 1.5, 0], ['OL', 1, 2.5, 0], ['OL', 2, 3.5, 0], ['OL', 3, 4.5, 0], ['WR', 0, 1, 1], ['QB', 0, 2.5, 1], ['RB', 0, 2.5, 2]]
   },
   def: {
     std: [['CB', 0, 1, 0], ['CB', 1, 4, 0], ['LB', 0, 2, 1], ['LB', 1, 3, 1], ['EDGE', 0, 1, 2], ['DT', 0, 2, 2], ['DT', 1, 3, 2], ['EDGE', 1, 4, 2]],
     cb3: [['CB', 0, 1, 0], ['CB', 2, 2.5, 0], ['CB', 1, 4, 0], ['LB', 0, 2.5, 1], ['EDGE', 0, 1, 2], ['DT', 0, 2, 2], ['DT', 1, 3, 2], ['EDGE', 1, 4, 2]],
-    lb3: [['CB', 0, 1, 0], ['CB', 1, 4, 0], ['LB', 0, 1.5, 1], ['LB', 1, 2.5, 1], ['LB', 2, 3.5, 1], ['EDGE', 0, 1, 2], ['DT', 0, 2.5, 2], ['EDGE', 1, 4, 2]]
+    lb3: [['CB', 0, 1, 0], ['CB', 1, 4, 0], ['LB', 0, 1.5, 1], ['LB', 1, 2.5, 1], ['LB', 2, 3.5, 1], ['EDGE', 0, 1, 2], ['DT', 0, 2.5, 2], ['EDGE', 1, 4, 2]],
+    dime: [['CB', 0, 1, 0], ['CB', 2, 2, 0], ['CB', 3, 3, 0], ['CB', 1, 4, 0], ['LB', 0, 2.5, 1], ['EDGE', 0, 1, 2], ['DT', 0, 2.5, 2], ['EDGE', 1, 4, 2]],
+    blz: [['CB', 0, 1, 0], ['CB', 1, 4, 0], ['EDGE', 2, 1, 1], ['LB', 0, 2.5, 1], ['EDGE', 3, 4, 1], ['EDGE', 0, 1, 2], ['DT', 0, 2.5, 2], ['EDGE', 1, 4, 2]]
   }
 };
 const SYN_DIST = 1.6;   // só jogadores vizinhos no campo se conectam
@@ -244,7 +251,7 @@ function makePool(db, n, extra, free) {
 function newBot(id, name, bench) {
   const pos = {}; POS_ORDER.forEach(p => pos[p] = .8 + R() * .45);
   const t = cfgTeam({ id, name, human: false, budget: BUDGET, roster: [], persona: { aggr: .85 + R() * .35, pos } }, bench);
-  const pick = sd => R() < .6 ? 'std' : Object.keys(FORMS[sd]).filter(f => f !== 'std')[rint(0, 1)];
+  const pick = sd => { const alt = Object.keys(FORMS[sd]).filter(f => f !== 'std'); return R() < .6 ? 'std' : alt[rint(0, alt.length - 1)]; };
   t.form = { off: pick('off'), def: pick('def') };      // bot escolhe a formação desde o começo (é pública)
   return t;
 }
