@@ -249,7 +249,6 @@ function labBatch(n) {
   <table class="cmp" style="margin-top:12px"><tr><th>${t('MÉDIA POR JOGO ({n})', { n })}</th><th></th></tr><tr><td>${t('Pontos A · B')}</td><td class="num">${(pts[0] / n).toFixed(1)} · ${(pts[1] / n).toFixed(1)}</td></tr><tr><td>${t('Touchdowns (os dois times)')}</td><td class="num">${(td / n).toFixed(2)}</td></tr><tr><td>${t('Field goals (os dois times)')}</td><td class="num">${(fg / n).toFixed(2)}</td></tr><tr><td>${t('Bolas roubadas (os dois times)')}</td><td class="num">${(to / n).toFixed(2)}</td></tr><tr><td>${t('Foi pra prorrogação')}</td><td class="num">${(otn / n * 100).toFixed(1)}%</td></tr></table>`;
 }
 ['a1', 'a2', 'b1', 'b2'].forEach(k => $('#r-' + k).oninput = () => { labProbs(); labReset(); $('#lab-stats').hidden = true; });
-$('#go-lab').onclick = () => { labProbs(); labReset(); show('lab'); };
 $('#lab-back').onclick = () => show('setup');
 $('#lab-step').onclick = labStep;
 $('#lab-reset').onclick = () => { labReset(); $('#lab-stats').hidden = true; };
@@ -802,7 +801,6 @@ function cupRun(newAuction) {
   G.confs = drawConferences(G.teams); fixConfNames(G.confs);
   svStart($('#cup-out'), -1, true);
 }
-$('#go-cup').onclick = () => { show('cup'); cupRun(true); };
 $('#cup-back').onclick = () => { svStop(); SV.el = null; show('setup'); };
 $('#cup-new').onclick = () => { cupRun(true); window.scrollTo(0, 0); };
 $('#cup-again').onclick = () => { cupRun(false); window.scrollTo(0, 0); };

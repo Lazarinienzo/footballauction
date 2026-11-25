@@ -358,3 +358,4 @@ Object.assign(I18N.en, {
   'O anfitrião inicia a temporada e as rodadas. Todos começam juntos.': 'The host starts the season and the rounds. Everyone starts together.',
   'Voltar ao menu': 'Back to menu', 'Som ligado': 'Sound on', 'Som desligado': 'Sound off'
 });
+Object.assign(I18N.en, { 'Jogar Online': 'Play Online', 'Jogar com Bots': 'Play with Bots' });
