@@ -29,7 +29,7 @@ function mpOpen() {
   ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (x) { return; } mpMsg(m); };
   ws.onclose = () => {
     if (MP.ws !== ws) return; MP.ws = null; if (MP.left) return;
-    if (!MP.joined) return mpFail(t('Não deu pra conectar. Tente de novo.'));
+    if (!MP.joined) return mpFail(t('Não deu pra conectar. O servidor pode estar lotado ou fora do ar. Tente de novo em alguns minutos.'));
     netBanner(true); mpRetry();
   };
 }
@@ -41,8 +41,10 @@ function mpFail(msg) {
   const wasIn = G.mp; mpLeave();
   if (wasIn) { show('online'); onSay(msg); onOpenPoll(); }
 }
+function mpSave() { MP.wasIn = true; try { sessionStorage.setItem('fa-room', JSON.stringify({ code: MP.code, pw: MP.pw || '' })); } catch (e) { } }
+function mpForget() { MP.wasIn = false; MP.rejoin = false; try { sessionStorage.removeItem('fa-room'); } catch (e) { } }
 function mpLeave() {
-  MP.left = true; clearTimeout(MP.retryT); clearInterval(MP.pingT);
+  mpForget(); MP.left = true; clearTimeout(MP.retryT); clearInterval(MP.pingT);
   if (MP.ws) { const w = MP.ws; MP.ws = null; try { w.onclose = null; if (w.readyState === 1) w.send(JSON.stringify({ t: 'leave' })); w.close(); } catch (e) { } }
   if (G.mp) { cancelAnimationFrame(G.raf); G.A = null; }
   G.mp = false; L.mp = false; L.wasMp = true; L.bots = []; L.log = []; MP.lobby = null; netBanner(false);
@@ -55,12 +57,15 @@ function mpMsg(m) {
     case 's': return mpSnap(m);
     case 'end': return mpEnd(m);
     case 'season': MP.seed = m.seed; if (G.mp && vis('results')) { svStart($('#season'), me().id, false); $('#sim').textContent = t('Refazer temporada'); $('#sim').hidden = !MP.host; $('#sim-wait').hidden = true; $('#season').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' }); } return;
+    case 'resume': MP.resume = m; if (G.mp && vis('results')) mpResume(m); return;
     case 'round': if (G.mp && vis('results') && SV.S && SV.done === m.n && !LV.running) { svStartRound(); if (MP.watch != null) { svOpen(MP.watch); MP.watch = null; } } return;
-    case 'closed': return mpFail(t('A sala foi encerrada.'));
+    case 'closed': return mpFail(t(m.why === 'inativa' ? 'A sala foi encerrada por inatividade.' : 'A sala foi encerrada.'));
     case 'err': {
       if (m.code === 'bug') return;
       if (m.code === 'exists' && MP.create && !MP.joined && MP.newCode++ < 8) return mpConnect(mkCode(), true, MP.pub, MP.pw);
       if (m.code === 'pass') { $('#on-code').value = MP.code; mpFail(t(m.wrong ? 'Senha incorreta.' : 'Essa sala tem senha. Digite a senha e toque em Entrar.')); setTimeout(() => $('#on-pw').focus(), 60); return; }
+      if (m.code === 'none' && (MP.rejoin || MP.wasIn)) return mpFail(t('Sua sala não existe mais: foi encerrada por inatividade. Crie uma nova ou entre em outra.'));
+      if (m.code === 'started' && MP.rejoin) return mpFail(t('Essa sala já começou o leilão e você não estava nela.'));
       const msg = { none: 'Sala não encontrada. Confira o código.', started: 'O leilão dessa sala já começou.', full: 'Essa sala está cheia.', kicked: 'O anfitrião tirou você da sala.', tok: 'Erro de identificação. Recarregue a página.' }[m.code] || 'Não deu pra entrar na sala.';
       return mpFail(t(msg));
     }
@@ -69,7 +74,7 @@ function mpMsg(m) {
 
 // ----- sala (antes do leilão) -----
 function mpLobby(m) {
-  MP.joined = true; MP.lobby = m; MP.host = mpIsHost(); MP.phase = 'lobby'; L.mp = true; L.code = m.code;
+  MP.joined = true; mpSave(); MP.lobby = m; MP.host = mpIsHost(); MP.phase = 'lobby'; L.mp = true; L.code = m.code;
   const mine = m.seats.find(s => s.uid === m.you);
   if (mine) {
     L.emb = mine.emb;
@@ -134,6 +139,7 @@ $('#lb-copy').onclick = mpCopy;
 // ----- leilão online -----
 function mpPool(list) { return list.map((p, i) => ({ id: i, name: p[0], pos: p[1], ovr: p[2], tm: p[3], passes: 0, sold: false })); }
 function mpStartMsg(m) {
+  mpSave();
   MP.host = !!m.host; MP.phase = MP.phase === 'results' ? 'results' : 'auction';
   const same = G.A && G.mpCode === m.code && G.teams.length === m.teams.length && G.A.pool.length === m.pool.length;
   G.meId = m.you;
@@ -174,9 +180,18 @@ function mpEnter() {
   show('auction'); paintAuction(true, 16);
   cancelAnimationFrame(G.raf); G.last = performance.now(); G.raf = requestAnimationFrame(frame);
 }
+// reconexão no meio da temporada: reconstrói a temporada e volta pra rodada que está rolando
+function mpResume(m) {
+  const have = SV.S && !$('#season').hidden && MP.seed === m.seed ? SV.done + (LV.running ? 1 : 0) : -1;
+  MP.resume = null;
+  if (have === m.rd) return;
+  MP.seed = m.seed; svStart($('#season'), me().id, false);
+  $('#sim').textContent = t('Refazer temporada'); $('#sim').hidden = !MP.host; $('#sim-wait').hidden = true;
+  if (m.rd > 0) { SV.done = m.rd - 1; svStartRound(); LV.t0 = performance.now() - m.since; }
+}
 function mpEnd(m) {
   if (!G.A || !G.mp) return;
-  MP.seed = m.seed; mpApplyTeams(m.teams);
+  MP.cseed = m.seed; mpApplyTeams(m.teams);
   if (MP.phase === 'results') return;
   MP.phase = 'results'; G.A.done = true; G.A.phase = 'done';
   if (MP.enter) { MP.enter = false; mpEnter(); }          // entrou só no fim (reconexão): a próxima volta do relógio abre os resultados
@@ -235,5 +250,18 @@ if (MP_ON) {
   try {
     const c = (new URLSearchParams(location.search).get('sala') || '').toUpperCase();
     if (/^[A-Z2-9]{4}$/.test(c)) { history.replaceState(null, '', location.pathname); setTimeout(() => { onOpen(); $('#on-code').value = c; onJoin(c); }, 0); }
+    else {                                                       // recarregou a página no meio de uma sala: volta pra ela
+      const sv = JSON.parse(sessionStorage.getItem('fa-room') || 'null');
+      if (sv && /^[A-Z2-9]{4}$/.test(sv.code)) setTimeout(() => { MP.rejoin = true; onOpen(); onSay(t('Voltando pra sua sala…')); mpConnect(sv.code, false, false, sv.pw || ''); }, 0);
+    }
   } catch (e) { }
 }
+
+// feedback: o contato vem do servidor (segredo CONTACT_EMAIL); sem ele, cai no GitHub
+$('#fb-link').onclick = async e => {
+  e.preventDefault();
+  let to = ''; try { to = (await (await fetch('/api/contact')).json()).email || ''; } catch (x) { }
+  if (!to) { window.open('https://github.com/Lazarinienzo/footballauction/issues/new', '_blank', 'noopener'); return; }
+  const body = t('Conte o que aconteceu ou o que você sugere:') + '\n\n\n---\n' + t('Sala') + ': ' + (MP.code || '-') + '\n' + navigator.userAgent;
+  location.href = 'mailto:' + to + '?subject=' + encodeURIComponent('Touchdown Auction: feedback') + '&body=' + encodeURIComponent(body);
+};

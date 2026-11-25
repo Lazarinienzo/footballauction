@@ -360,3 +360,11 @@ Object.assign(I18N.en, {
 });
 Object.assign(I18N.en, { 'Jogar Online': 'Play Online', 'Jogar com Bots': 'Play with Bots' });
 Object.assign(I18N.en, { 'Tema escuro': 'Dark theme', 'Tema claro': 'Light theme' });
+Object.assign(I18N.en, {
+  'A sala foi encerrada por inatividade.': 'The room was closed for inactivity.',
+  'Sua sala não existe mais: foi encerrada por inatividade. Crie uma nova ou entre em outra.': 'Your room no longer exists: it was closed for inactivity. Create a new one or join another.',
+  'Essa sala já começou o leilão e você não estava nela.': 'That room already started its auction and you were not in it.',
+  'Voltando pra sua sala…': 'Going back to your room…',
+  'Não deu pra conectar. O servidor pode estar lotado ou fora do ar. Tente de novo em alguns minutos.': "Couldn't connect. The server may be full or down. Try again in a few minutes."
+});
+Object.assign(I18N.en, { 'Enviar feedback ou reportar problema': 'Send feedback or report a problem', 'Privacidade': 'Privacy', 'Termos': 'Terms', 'Conte o que aconteceu ou o que você sugere:': 'Tell us what happened or what you suggest:', 'Sala': 'Room' });

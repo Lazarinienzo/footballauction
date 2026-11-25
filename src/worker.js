@@ -16,6 +16,8 @@ export default {
       return env.ROOM.get(env.ROOM.idFromName(code)).fetch(req);
     }
     if (path === '/api/rooms') return env.LOBBY.get(env.LOBBY.idFromName('main')).fetch(new Request('https://lobby/list'));
+    if (path === '/api/stats') return env.LOBBY.get(env.LOBBY.idFromName('main')).fetch(new Request('https://lobby/stats'));
+    if (path === '/api/contact') return json({ email: env.CONTACT_EMAIL || '' });
     if (path === '/api/health') return json({ ok: true });
     return env.ASSETS.fetch(req);
   },

@@ -13,7 +13,7 @@ export class Room extends DurableObject {
     this.init();
   }
   init() {
-    Object.assign(this, { created: false, pub: false, pw: '', phase: 'lobby', seats: [], uid: 0, A: null, teams: null, seed: null, code: '', sentV: -1, lastSync: 0, hold: 0, key: '', active: Date.now(), emptyAt: 0, lastReg: 0 });
+    Object.assign(this, { created: false, pub: false, pw: '', phase: 'lobby', seats: [], uid: 0, A: null, teams: null, seed: null, cseed: null, rd: 0, roundAt: 0, seasonOn: false, code: '', sentV: -1, lastSync: 0, hold: 0, key: '', active: Date.now(), emptyAt: 0, lastReg: 0 });
   }
 
   async fetch(req) {
@@ -56,8 +56,8 @@ export class Room extends DurableObject {
       case 'bid': case 'pass': return this.play(c, s, m);
     }
     if (this.phase === 'lobby') this.lobbyMsg(c, s, m);
-    else if (this.phase === 'done' && m.t === 'reseason' && s.host) { this.seed = seedNow(); this.rd = 0; this.all({ t: 'season', seed: this.seed }); }
-    else if (this.phase === 'done' && m.t === 'round' && s.host) { const n = m.n | 0; if (n === (this.rd | 0)) { this.rd = n + 1; this.all({ t: 'round', n }); } }
+    else if (this.phase === 'done' && m.t === 'reseason' && s.host) { this.seed = seedNow(); this.rd = 0; this.roundAt = 0; this.seasonOn = true; this.all({ t: 'season', seed: this.seed }); }
+    else if (this.phase === 'done' && m.t === 'round' && s.host) { const n = m.n | 0; if (this.seasonOn && n === (this.rd | 0)) { this.rd = n + 1; this.roundAt = Date.now(); this.all({ t: 'round', n }); } }
   }
 
   join(c, m) {
@@ -67,7 +67,7 @@ export class Room extends DurableObject {
     let s = this.seats.find(x => x.tok === tok);
     if (!this.created) {
       if (!m.create) return this.send(c, { t: 'err', code: 'none' });
-      this.created = true; this.pub = !!m.pub; this.pw = String(m.pw || '').slice(0, 24); this.startHousekeeping();
+      this.created = true; this.stat('rooms'); this.pub = !!m.pub; this.pw = String(m.pw || '').slice(0, 24); this.startHousekeeping();
     } else if (m.create && !s) return this.send(c, { t: 'err', code: 'exists' });
     else if (!s && this.pw && String(m.pw || '').slice(0, 24) !== this.pw) return this.send(c, { t: 'err', code: 'pass', wrong: !!m.pw });
     if (s) {                                               // reconexão: assume o assento de volta
@@ -84,12 +84,12 @@ export class Room extends DurableObject {
       let emb = m.emb; if (!this.validEmb(emb)) emb = this.freeEmb();
       s = { uid: ++this.uid, kind: 'human', name: clean(m.name), emb, auto: !!m.auto || !clean(m.name), tok, c, awayAt: 0, host: !this.seats.some(x => x.host) };
       if (s.emb !== m.emb) s.auto = true;
-      this.seats.push(s); c.seat = s;
+      this.seats.push(s); c.seat = s; this.stat('joins');
     }
     this.active = Date.now();
     if (this.phase === 'lobby') { this.pushLobby(); this.register(); return; }
     this.sendStart(c); this.sendSnap(c, true);
-    if (this.phase === 'done') this.sendEnd(c);
+    if (this.phase === 'done') { this.sendEnd(c); this.sendResume(c); }
   }
 
   leave(s) {
@@ -123,6 +123,7 @@ export class Room extends DurableObject {
   kick(t) { if (t.c) { this.send(t.c, { t: 'err', code: 'kicked' }); t.c.seat = null; try { t.c.ws.close(1000, 'expulso'); } catch (e) { } this.conns.delete(t.c); t.c = null; } }
   lobbyView() { return { t: 'lobby', code: this.code, pub: this.pub, lock: !!this.pw, max: MAX_SEATS, min: MIN_TEAMS, seats: this.seats.map(s => ({ uid: s.uid, kind: s.kind, name: s.name, emb: s.emb, auto: s.auto, host: !!s.host, ready: s.kind === 'bot' || !!s.host || !!s.ready, on: s.kind === 'bot' || !!s.c })) }; }
   pushLobby() { const v = this.lobbyView(); for (const c of this.conns) if (c.seat) this.send(c, { ...v, you: c.seat.uid }); }
+  stat(k, n) { try { this.env.LOBBY.get(this.env.LOBBY.idFromName('main')).fetch('https://lobby/stat', { method: 'POST', body: JSON.stringify({ k, n }) }).catch(() => { }); } catch (e) { } }
   register() {
     const h = this.host(), open = this.created && this.pub && this.phase === 'lobby' && !!h;
     const body = open ? { code: this.code, host: h.name, auto: h.auto, emb: h.emb, n: this.seats.length, max: MAX_SEATS, lock: !!this.pw, open: true } : { code: this.code };
@@ -134,6 +135,7 @@ export class Room extends DurableObject {
   start() {
     this.teams = this.seats.map((s, i) => { const t = newBot(i, s.name || ('T' + i)); t.emb = s.emb; t.human = s.kind === 'human'; s.team = t; s.botted = false; if (t.human) s.awayAt = s.c ? 0 : Date.now(); return t; });
     this.A = new Auction(this.teams, DB);
+    this.stat('games'); this.stat('players', this.seats.filter(x => x.kind === 'human').length);
     this.phase = 'auction'; this.hold = Date.now() + HOLD_MS; this.sentV = -1; this.key = '';
     this.register();
     for (const c of this.conns) if (c.seat) { this.sendStart(c); this.sendSnap(c, true); }
@@ -175,12 +177,13 @@ export class Room extends DurableObject {
     const k = this.stateKey();
     if (k !== this.key || now - this.lastSync >= 1000) { this.key = k; this.pushSnap(); }
   }
-  endView() { return { t: 'end', seed: this.seed, teams: this.teams.map(t => ({ b: t.budget, r: t.roster.map(p => [p.id, p.paid]), au: (t.auto || []).map(p => p.id) })) }; }
+  endView() { return { t: 'end', seed: this.cseed, teams: this.teams.map(t => ({ b: t.budget, r: t.roster.map(p => [p.id, p.paid]), au: (t.auto || []).map(p => p.id) })) }; }
   sendEnd(c) { this.send(c, this.endView()); }
+  sendResume(c) { if (this.seasonOn) this.send(c, { t: 'resume', seed: this.seed, rd: this.rd | 0, since: this.roundAt ? Date.now() - this.roundAt : 0 }); }
   finish() {
     clearInterval(this.loop); this.teams.forEach(finishTeam);
-    this.phase = 'done'; this.rd = 0; this.seed = seedNow(); this.active = Date.now();
-    this.all(this.endView());
+    this.phase = 'done'; this.rd = 0; this.roundAt = 0; this.seasonOn = false; this.cseed = seedNow(); this.seed = this.cseed; this.active = Date.now();
+    this.all(this.endView()); this.stat('done');
   }
 
   // ---------- manutenção ----------

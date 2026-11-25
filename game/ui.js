@@ -348,7 +348,7 @@ $('#lb-go').onclick = () => {
 function themeSync() {
   const lt = document.documentElement.dataset.theme === 'light';
   document.querySelectorAll('[data-theme-toggle]').forEach(b => { const l = t(lt ? 'Tema escuro' : 'Tema claro'); b.setAttribute('aria-label', l); b.title = l; });
-  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = lt ? '#f4eee3' : '#050d26';
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = lt ? '#f4eee3' : '#02060f';
 }
 document.addEventListener('click', e => {
   if (!e.target.closest('[data-theme-toggle]')) return;
@@ -632,9 +632,10 @@ function teamLineupHTML(t) {
 }
 function showResults() {
   G.teams.forEach(finishTeam);
-  G.confs = withSeed(G.mp ? MP.seed : null, () => drawConferences(G.teams)); fixConfNames(G.confs);
+  G.confs = withSeed(G.mp ? MP.cseed : null, () => drawConferences(G.teams)); fixConfNames(G.confs);
   show('results');
   paintResults();
+  if (G.mp && MP.resume) mpResume(MP.resume);
 }
 function paintResults() {
   { const au = (me().auto || []); $('#r-lineup').innerHTML = teamLineupHTML(me()) + (au.length ? `<p class="note" style="margin-top:12px">${t('Você passou em alguns jogadores, então o jogo completou seu time por sorteio (US$ 1 cada): {l}.', { l: au.map(p => esc(p.name) + ' (' + p.pos + ' ' + p.ovr + ')').join(', ') })}</p>` : ''); }
@@ -901,7 +902,7 @@ async function teamCardURL(t, info) {
   const F = (w, px) => `${w} ${px}px "Inter Tight","Helvetica Neue",Arial,sans-serif`, B = (w, px) => `${w} ${px}px "Inter","Helvetica Neue",Arial,sans-serif`;
   const rr = (x, y, w, h, r) => { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); };
   const fit = (txt, maxW) => { if (c.measureText(txt).width <= maxW) return txt; while (txt.length > 1 && c.measureText(txt + '…').width > maxW) txt = txt.slice(0, -1); return txt + '…'; };
-  const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0c2f7c'); g.addColorStop(.38, '#071a45'); g.addColorStop(.75, '#020817'); g.addColorStop(1, '#000'); c.fillStyle = g; c.fillRect(0, 0, W, H);
+  const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0a1b3d'); g.addColorStop(.38, '#050d1f'); g.addColorStop(.75, '#02060f'); g.addColorStop(1, '#000'); c.fillStyle = g; c.fillRect(0, 0, W, H);
   c.textBaseline = 'alphabetic'; c.textAlign = 'left';
   c.fillStyle = '#f6d64a'; c.font = B(800, 26); if ('letterSpacing' in c) c.letterSpacing = '5px'; c.fillText('TOUCHDOWN AUCTION', 60, 70); if ('letterSpacing' in c) c.letterSpacing = '0px';
   const em = EMB[t.emb] || EMB[0], img = await emblemImg(t.emb, 96);
