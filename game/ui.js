@@ -384,6 +384,12 @@ const sfx = {
     g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(v, t0 + .015); g.gain.exponentialRampToValueAtTime(.001, t0 + .22);
     o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + .24);
   },
+  tick(n) {                                              // tique do relógio a cada segundo
+    if (!sfx.on || !sfx.ctx || sfx.ctx.state !== 'running') return;
+    const c = sfx.ctx, t0 = c.currentTime, o = c.createOscillator(), g = c.createGain(); o.type = 'square';
+    o.frequency.value = n <= 1 ? 1500 : n <= 3 ? 1050 : 800; g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(n <= 1 ? .07 : n <= 3 ? .05 : .035, t0 + .005); g.gain.exponentialRampToValueAtTime(.001, t0 + .09);
+    o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + .1);
+  },
   paint() { const b = $('#a-snd'); if (b) { b.classList.toggle('off', !sfx.on); b.setAttribute('aria-pressed', String(sfx.on)); b.setAttribute('aria-label', t(sfx.on ? 'Som ligado' : 'Som desligado')); } }
 };
 document.addEventListener('pointerdown', sfx.unlock); document.addEventListener('keydown', sfx.unlock);
@@ -489,7 +495,9 @@ function paintAuction(force, dt) {
     G.fracShown = target > G.fracShown ? G.fracShown + (target - G.fracShown) * Math.min(1, dt / 70) : target;
     const late = A.timeLeft <= 3000 && A.humanIn;
     $('#clock').classList.toggle('low', late); $('#s-cd').classList.toggle('low', late);
-    setText($('#s-cd'), Math.max(0, Math.ceil(A.timeLeft / 1000)) + 's');
+    const cd = Math.max(0, Math.ceil(Math.round(A.timeLeft) / 1000));
+    if (cd !== G.cdShown) { G.cdShown = cd; if (A.phase === 'bidding' && A.humanIn && cd >= 1 && !(A.hold > 0)) sfx.tick(cd); }
+    setText($('#s-cd'), cd + 's');
     // pregão do leiloeiro
     let call = '';
     if (!A.humanIn) call = A.passed.has(M) ? t('Você passou. Avançando…') : (A.elig.includes(M) ? '' : t('Você está fora dessa vaga. Avançando…'));

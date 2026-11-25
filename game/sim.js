@@ -3,7 +3,7 @@ const SLOTS = { QB: 1, RB: 1, WR: 2, TE: 1, OL: 3, EDGE: 2, DT: 2, LB: 2, CB: 2 
 const POS_ORDER = ['QB', 'RB', 'WR', 'TE', 'OL', 'EDGE', 'DT', 'LB', 'CB'];
 const OFF_POS = ['QB', 'RB', 'WR', 'TE', 'OL'];
 const TOTAL_SLOTS = 16, BUDGET = 200;
-const LOT_MS = 10000, LATE_MS = 3000;   // tempo do lote e reset do lance de última hora
+const LOT_MS = 6000, BID_MS = 4000;   // tempo do lote; cada lance leva o relógio pra BID_MS
 let RNG = Math.random;                         // gerador trocável: com semente, todos os clientes sorteiam a mesma temporada
 const R = () => RNG();
 function mulberry32(a) { return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -182,10 +182,9 @@ class Auction {
     if (amount <= this.price || amount > maxBid(team, this.cur)) return false;
     this.bids.push({ team, kind: 'bid', price: amount, inc: amount - this.price, first: this.price === 0 }); this.nBids++; if (this.bids.length > 12) this.bids.shift();
     this.price = amount; this.leader = team;
-    // lote dura 10s; cada lance soma +1s (teto de 10s); lance na reta final (3, 2 ou 1s) devolve o relógio pra 3s
-    if (this.humanIn) this.timeLeft = this.timeLeft <= LATE_MS ? LATE_MS : Math.min(LOT_MS, this.timeLeft + 1000);
-    else if (this.timeLeft <= 1300) this.timeLeft = 1300;
-    this.timeMax = Math.max(this.timeMax, this.timeLeft);
+    // lote dura 6s; cada lance leva o relógio pra 4s (dinâmico: quem dá lance recomeça a contagem)
+    if (this.humanIn) { this.timeLeft = BID_MS; this.timeMax = BID_MS; }
+    else { if (this.timeLeft <= 1300) this.timeLeft = 1300; this.timeMax = Math.max(this.timeMax, this.timeLeft); }
     this.settle();
     return true;
   }
