@@ -761,6 +761,8 @@ html,body{overflow-x:hidden}
 /* mesa */
 .dstage{position:relative;border-radius:24px;padding:14px;min-height:360px;background:radial-gradient(120% 90% at 50% 0%,rgba(77,141,255,.22),rgba(255,255,255,.03) 70%);border:1px solid var(--line);overflow:hidden}
 .dtable{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stale{position:fixed;left:12px;right:12px;bottom:12px;z-index:60;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;background:var(--flag);color:var(--flag-ink);font-weight:700;font-size:14px;line-height:1.3;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.stale span{flex:1}.stale .btn{width:auto;padding:10px 16px;background:var(--flag-ink);color:var(--flag)}
 /* telas largas: mesa no meio, um time de cada lado (anfitrião à esquerda) */
 @media (min-width:1000px){
   #du-body.dwide{max-width:none;display:grid;grid-template-columns:minmax(220px,1fr) minmax(0,560px) minmax(220px,1fr);column-gap:32px;align-items:start}
@@ -1688,6 +1690,7 @@ function simSeason(teams, confs) {
 // Quem começa alterna a cada rodada; quem joga depois vê o que o outro virou. Formação padrão pros dois.
 const DU_CFG = { QB: { n: 9, f: 3, k: 1 }, RB: { n: 9, f: 3, k: 1 }, WR: { n: 9, f: 3, k: 2 }, TE: { n: 9, f: 3, k: 1 }, OL: { n: 9, f: 4, k: 3 }, EDGE: { n: 9, f: 3, k: 2 }, DT: { n: 9, f: 3, k: 2 }, LB: { n: 9, f: 3, k: 2 }, CB: { n: 9, f: 3, k: 2 } };
 // raridade no sorteio do tabuleiro: chance por carta de ser diamante (90+) e ouro (80–89); o resto é bronze (70–79). Se a faixa não existe na posição, a chance vai pra faixa de baixo (o diamante não cresce).
+const BUILD = 'c4e75335';   // o build.py troca pelo hash dos fontes: cliente e servidor comparam pra avisar quando a página está desatualizada
 const DU_RARE = { d: .035, g: .35 };
 function duDraw(all, n) {
   const B = [[], [], []]; shuffle(all).forEach(p => B[p.ovr >= 90 ? 2 : p.ovr >= 80 ? 1 : 0].push(p.id));
@@ -2323,6 +2326,8 @@ Object.assign(I18N.en, {
   'Ajuste seu nome e escudo e marque pronto.': 'Set your name and crest, then tap ready.',
   'Aguardando {n} ficar pronto…': 'Waiting for {n} to get ready…'
 });
+
+Object.assign(I18N.en, {'Saiu uma versão nova do jogo. Recarregue a página pra jogar com ela.': 'A new version of the game is out. Reload the page to play with it.', 'Recarregar': 'Reload'});
 const MP_ON = true;      // o build online troca por true (precisa do servidor Cloudflare)
 // ---------- interface ----------
 const $ = s => document.querySelector(s);
@@ -4060,7 +4065,15 @@ function duWS() {
 }
 const duSend = o => { try { if (DU.ws && DU.ws.readyState === 1) DU.ws.send(JSON.stringify(o)); } catch (e) { } };
 function duFail(msg) { duStop(); DU.mode = 'menu'; DU.msg = msg; show('duel'); duPaint(); }
+// a página aberta é de outra versão que o servidor: avisa pra recarregar (senão fica jogando com código velho)
+function duStale() {
+  if (document.getElementById('stale')) return;
+  const d = document.createElement('div'); d.id = 'stale'; d.className = 'stale'; d.setAttribute('role', 'alert');
+  d.innerHTML = `<span>${t('Saiu uma versão nova do jogo. Recarregue a página pra jogar com ela.')}</span><button type="button" class="btn" id="stale-go">${t('Recarregar')}</button>`;
+  document.body.appendChild(d); $('#stale-go').onclick = () => location.reload();
+}
 function duMsg(m) {
+  if ((m.t === 'dwait' || m.t === 'd') && m.ver && m.ver !== BUILD) duStale();
   switch (m.t) {
     case 'dwait': dtReset(); DU.joined = true; DU.mode = 'wait'; DU.wait = m; DU.code = m.code; DU.you = m.you; DU.seats = m.seats; DU.show = m.show; DU.v = null; DU.played = false; DU.playSeen = null; if (m.seats[m.you]) L.emb = m.seats[m.you].emb; try { sessionStorage.setItem('fa-duel', m.code); } catch (e) { } if (!vis('duel')) show('duel'); return duPaint();
     case 'd': {

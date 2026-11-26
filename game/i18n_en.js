@@ -528,3 +528,5 @@ Object.assign(I18N.en, {
   'Ajuste seu nome e escudo e marque pronto.': 'Set your name and crest, then tap ready.',
   'Aguardando {n} ficar pronto…': 'Waiting for {n} to get ready…'
 });
+
+Object.assign(I18N.en, {'Saiu uma versão nova do jogo. Recarregue a página pra jogar com ela.': 'A new version of the game is out. Reload the page to play with it.', 'Recarregar': 'Reload'});

@@ -1,6 +1,6 @@
 // Uma sala de Duelo (1 contra 1): cartas viradas, posição por posição. O servidor manda; cada jogador só recebe as cartas que já foram viradas.
 import { DurableObject } from 'cloudflare:workers';
-import { DB, Duelo, DU_TURN_MS, DU_EXTRA } from './engine.js';
+import { DB, Duelo, DU_TURN_MS, DU_EXTRA, BUILD } from './engine.js';
 
 const EMB_N = 32, AWAY_MS = 12000, NEXT_MS = 700;
 const clean = s => String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 44);
@@ -80,7 +80,7 @@ export class Duel extends DurableObject {
     this.pushWait();
   }
   info() { return this.seats.map((s, i) => ({ name: s.name, emb: s.emb, on: !!s.c, ready: i === 0 ? true : !!s.ready })); }
-  pushWait() { for (const c of this.conns) if (c.seat) this.send(c, { t: 'dwait', code: this.code, show: this.show, host: this.idx(c.seat) === 0, you: this.idx(c.seat), seats: this.info() }); }
+  pushWait() { for (const c of this.conns) if (c.seat) this.send(c, { t: 'dwait', ver: BUILD, code: this.code, show: this.show, host: this.idx(c.seat) === 0, you: this.idx(c.seat), seats: this.info() }); }
   begin() {
     this.G = new Duelo(DB, { show: this.show, first: Math.random() < .5 ? 0 : 1 }); this.phase = 'play'; this.again = new Set(); this.playN = 0; this.seed = seedNow();
     this.seats.forEach(s => { s.awayAt = s.c ? 0 : Date.now(); }); this.turn(DU_EXTRA.first); this.pushAll();
@@ -89,7 +89,7 @@ export class Duel extends DurableObject {
   extra(r, cur) { const G = this.G; return G.r !== r ? DU_EXTRA.round : G.cur !== cur ? DU_EXTRA.swap : 0; }
   view(c) {
     const p = this.idx(c.seat), G = this.G;
-    return { t: 'd', you: p, ph: this.phase, code: this.code, ...G.view(p), left: Math.max(0, this.deadline - Date.now()), seed: G.done ? this.seed : null, seats: this.info(), again: [...this.again], play: this.playN };
+    return { t: 'd', ver: BUILD, you: p, ph: this.phase, code: this.code, ...G.view(p), left: Math.max(0, this.deadline - Date.now()), seed: G.done ? this.seed : null, seats: this.info(), again: [...this.again], play: this.playN };
   }
   pushAll() { if (!this.G) return this.pushWait(); for (const c of this.conns) if (c.seat) this.send(c, this.view(c)); }
   play(s, m) {

@@ -70,7 +70,15 @@ function duWS() {
 }
 const duSend = o => { try { if (DU.ws && DU.ws.readyState === 1) DU.ws.send(JSON.stringify(o)); } catch (e) { } };
 function duFail(msg) { duStop(); DU.mode = 'menu'; DU.msg = msg; show('duel'); duPaint(); }
+// a página aberta é de outra versão que o servidor: avisa pra recarregar (senão fica jogando com código velho)
+function duStale() {
+  if (document.getElementById('stale')) return;
+  const d = document.createElement('div'); d.id = 'stale'; d.className = 'stale'; d.setAttribute('role', 'alert');
+  d.innerHTML = `<span>${t('Saiu uma versão nova do jogo. Recarregue a página pra jogar com ela.')}</span><button type="button" class="btn" id="stale-go">${t('Recarregar')}</button>`;
+  document.body.appendChild(d); $('#stale-go').onclick = () => location.reload();
+}
 function duMsg(m) {
+  if ((m.t === 'dwait' || m.t === 'd') && m.ver && m.ver !== BUILD) duStale();
   switch (m.t) {
     case 'dwait': dtReset(); DU.joined = true; DU.mode = 'wait'; DU.wait = m; DU.code = m.code; DU.you = m.you; DU.seats = m.seats; DU.show = m.show; DU.v = null; DU.played = false; DU.playSeen = null; if (m.seats[m.you]) L.emb = m.seats[m.you].emb; try { sessionStorage.setItem('fa-duel', m.code); } catch (e) { } if (!vis('duel')) show('duel'); return duPaint();
     case 'd': {

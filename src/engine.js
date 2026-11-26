@@ -535,6 +535,7 @@ function simSeason(teams, confs) {
 // Quem começa alterna a cada rodada; quem joga depois vê o que o outro virou. Formação padrão pros dois.
 const DU_CFG = { QB: { n: 9, f: 3, k: 1 }, RB: { n: 9, f: 3, k: 1 }, WR: { n: 9, f: 3, k: 2 }, TE: { n: 9, f: 3, k: 1 }, OL: { n: 9, f: 4, k: 3 }, EDGE: { n: 9, f: 3, k: 2 }, DT: { n: 9, f: 3, k: 2 }, LB: { n: 9, f: 3, k: 2 }, CB: { n: 9, f: 3, k: 2 } };
 // raridade no sorteio do tabuleiro: chance por carta de ser diamante (90+) e ouro (80–89); o resto é bronze (70–79). Se a faixa não existe na posição, a chance vai pra faixa de baixo (o diamante não cresce).
+const BUILD = 'c4e75335';   // o build.py troca pelo hash dos fontes: cliente e servidor comparam pra avisar quando a página está desatualizada
 const DU_RARE = { d: .035, g: .35 };
 function duDraw(all, n) {
   const B = [[], [], []]; shuffle(all).forEach(p => B[p.ovr >= 90 ? 2 : p.ovr >= 80 ? 1 : 0].push(p.id));
@@ -599,4 +600,4 @@ class Duelo {
 function duelGame(teams, seed) { return withSeed(seed, () => simGame(teams[0], teams[1], { noTie: true })); }
 
 
-export { DB, SLOTS, POS_ORDER, OFF_POS, TOTAL_SLOTS, BUDGET, FORMS, BENCH_TOTAL, Auction, newBot, cfgTeam, validForm, maxTeams, feasible, canForm, finishTeam, withSeed, rint, R, maxBid, need, slotsLeft, MIN_TEAMS, Duelo, duelGame, DU_CFG, DU_TURN_MS, DU_EXTRA };
+export { BUILD, DB, SLOTS, POS_ORDER, OFF_POS, TOTAL_SLOTS, BUDGET, FORMS, BENCH_TOTAL, Auction, newBot, cfgTeam, validForm, maxTeams, feasible, canForm, finishTeam, withSeed, rint, R, maxBid, need, slotsLeft, MIN_TEAMS, Duelo, duelGame, DU_CFG, DU_TURN_MS, DU_EXTRA };
