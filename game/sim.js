@@ -514,9 +514,21 @@ function simSeason(teams, confs) {
 // ---------- modo Duelo (1 contra 1): cartas viradas, posição por posição ----------
 // Cada rodada sorteia uma posição. Cada jogador tem o SEU tabuleiro de n cartas (as mesmas pessoas podem aparecer nos dois). Vira f às cegas e escolhe k entre as viradas.
 // Quem começa alterna a cada rodada; quem joga depois vê o que o outro virou. Formação padrão pros dois.
-const DU_CFG = { QB: { n: 6, f: 3, k: 1 }, RB: { n: 6, f: 3, k: 1 }, WR: { n: 6, f: 3, k: 2 }, TE: { n: 6, f: 3, k: 1 }, OL: { n: 6, f: 4, k: 3 }, EDGE: { n: 6, f: 3, k: 2 }, DT: { n: 6, f: 3, k: 2 }, LB: { n: 6, f: 3, k: 2 }, CB: { n: 6, f: 3, k: 2 } };
+const DU_CFG = { QB: { n: 9, f: 3, k: 1 }, RB: { n: 9, f: 3, k: 1 }, WR: { n: 9, f: 3, k: 2 }, TE: { n: 9, f: 3, k: 1 }, OL: { n: 9, f: 4, k: 3 }, EDGE: { n: 9, f: 3, k: 2 }, DT: { n: 9, f: 3, k: 2 }, LB: { n: 9, f: 3, k: 2 }, CB: { n: 9, f: 3, k: 2 } };
+// raridade no sorteio do tabuleiro: chance por carta de ser diamante (90+) e ouro (80–89); o resto é bronze (70–79). Se a faixa não existe na posição, a chance vai pra faixa de baixo (o diamante não cresce).
+const DU_RARE = { d: .035, g: .35 };
+function duDraw(all, n) {
+  const B = [[], [], []]; shuffle(all).forEach(p => B[p.ovr >= 90 ? 2 : p.ovr >= 80 ? 1 : 0].push(p.id));
+  const out = [];
+  while (out.length < n) {
+    const r = R(), want = r < DU_RARE.d ? 2 : r < DU_RARE.d + DU_RARE.g ? 1 : 0;
+    const tier = [[0, 1, 2], [1, 0, 2], [2, 1, 0]][want].find(k => B[k].length); if (tier == null) break;
+    out.push(B[tier].pop());
+  }
+  return shuffle(out);
+}
 const DU_TURN_MS = 30000;
-const DU_EXTRA = { first: 7500, round: 12300, swap: 7300 };   // tempo extra no relógio do turno pras animações (sorteio, cartas entrando e saindo da mesa)
+const DU_EXTRA = { first: 7500, round: 12900, swap: 7900 };   // tempo extra no relógio do turno pras animações (sorteio, cartas entrando e saindo da mesa)
 class Duelo {
   constructor(db, o) {
     o = o || {}; this.db = db.map((p, i) => ({ ...p, id: i })); this.show = !!o.show;
@@ -527,7 +539,7 @@ class Duelo {
   draw() {
     const pos = this.pos, c = DU_CFG[pos], all = this.db.filter(p => p.pos === pos);
     this.prev = this.board ? this.board.map(b => b.slice()) : null;       // tabuleiros da rodada anterior (pra revelar o que ficou de fora)
-    this.board = [0, 1].map(() => shuffle(all).slice(0, c.n).map(p => p.id));
+    this.board = [0, 1].map(() => duDraw(all, c.n));
     this.fl = [[], []]; this.sel = [[], []]; this.ok = [false, false]; this.cur = (this.r + this.first) % 2;
   }
   flip(p, i) { const c = this.cfg; if (this.done || p !== this.cur || this.ok[p] || !Number.isInteger(i) || i < 0 || i >= c.n || this.fl[p].includes(i) || this.fl[p].length >= c.f) return false; this.fl[p].push(i); return true; }

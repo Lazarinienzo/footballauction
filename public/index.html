@@ -761,6 +761,7 @@ html,body{overflow-x:hidden}
 /* mesa */
 .dstage{position:relative;border-radius:24px;padding:14px;min-height:360px;background:radial-gradient(120% 90% at 50% 0%,rgba(77,141,255,.22),rgba(255,255,255,.03) 70%);border:1px solid var(--line);overflow:hidden}
 .dtable{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.dtable.n9{gap:8px}.dtable.n9 .dc{height:122px}.dtable.n9 .dc .face{padding:6px 3px;gap:2px}.dtable.n9 .dn{font-size:12px}.dtable.n9 .dp{font-size:10.5px}.dtable.n9 .dov{font-size:19px}.dtable.n9 .fbk small{font-size:7px}.dtable.n9 .fbk svg{width:30px;height:30px}
 .dc{position:relative;perspective:800px;min-width:0;height:158px;cursor:default;outline:none}
 .dc.can{cursor:pointer}.dc.can:focus-visible .in{box-shadow:0 0 0 3px var(--hi)}
 .dc .in{position:absolute;inset:0;transition:transform .9s cubic-bezier(.3,.7,.2,1);transform-style:preserve-3d;border-radius:16px}
@@ -801,10 +802,10 @@ html[data-theme=light] .dc .fft{--cb:#fffdf7;color:#0f1a38}
 .tdot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:-4px}
 .tdot.b{background:linear-gradient(135deg,#f0b27a,#8a4f1d)}.tdot.g{background:linear-gradient(135deg,#fff3a8,#b8860b)}.tdot.d{background:linear-gradient(135deg,#c9f6ff,#5fb4ff,#e6d2ff)}
 /* cartas entram e saem */
-.dealing .dc{animation:dudeal .75s cubic-bezier(.2,.8,.25,1) both;animation-delay:calc(var(--k)*.24s)}
+.dealing .dc{animation:dudeal .75s cubic-bezier(.2,.8,.25,1) both;animation-delay:calc(var(--k)*.17s)}
 @keyframes dudeal{from{transform:translateY(-150px) rotate(-9deg) scale(.6);opacity:0}60%{opacity:1}to{transform:none;opacity:1}}
-.leaving .dc{animation:duout .8s cubic-bezier(.5,0,.8,.4) both;animation-delay:calc(var(--k)*.09s)}
-.leaving .dc.sel{animation-name:dupick;animation-delay:calc(var(--k)*.09s + .25s)}
+.leaving .dc{animation:duout .8s cubic-bezier(.5,0,.8,.4) both;animation-delay:calc(var(--k)*.06s)}
+.leaving .dc.sel{animation-name:dupick;animation-delay:calc(var(--k)*.06s + .25s)}
 @keyframes duout{to{transform:translateY(190px) rotate(8deg) scale(.7);opacity:0}}
 @keyframes dupick{40%{transform:translateY(-18px) scale(1.08);opacity:1}to{transform:translateY(-120px) scale(.7);opacity:0}}
 /* sorteio da posição (caça-níquel) */
@@ -1673,9 +1674,21 @@ function simSeason(teams, confs) {
 // ---------- modo Duelo (1 contra 1): cartas viradas, posição por posição ----------
 // Cada rodada sorteia uma posição. Cada jogador tem o SEU tabuleiro de n cartas (as mesmas pessoas podem aparecer nos dois). Vira f às cegas e escolhe k entre as viradas.
 // Quem começa alterna a cada rodada; quem joga depois vê o que o outro virou. Formação padrão pros dois.
-const DU_CFG = { QB: { n: 6, f: 3, k: 1 }, RB: { n: 6, f: 3, k: 1 }, WR: { n: 6, f: 3, k: 2 }, TE: { n: 6, f: 3, k: 1 }, OL: { n: 6, f: 4, k: 3 }, EDGE: { n: 6, f: 3, k: 2 }, DT: { n: 6, f: 3, k: 2 }, LB: { n: 6, f: 3, k: 2 }, CB: { n: 6, f: 3, k: 2 } };
+const DU_CFG = { QB: { n: 9, f: 3, k: 1 }, RB: { n: 9, f: 3, k: 1 }, WR: { n: 9, f: 3, k: 2 }, TE: { n: 9, f: 3, k: 1 }, OL: { n: 9, f: 4, k: 3 }, EDGE: { n: 9, f: 3, k: 2 }, DT: { n: 9, f: 3, k: 2 }, LB: { n: 9, f: 3, k: 2 }, CB: { n: 9, f: 3, k: 2 } };
+// raridade no sorteio do tabuleiro: chance por carta de ser diamante (90+) e ouro (80–89); o resto é bronze (70–79). Se a faixa não existe na posição, a chance vai pra faixa de baixo (o diamante não cresce).
+const DU_RARE = { d: .035, g: .35 };
+function duDraw(all, n) {
+  const B = [[], [], []]; shuffle(all).forEach(p => B[p.ovr >= 90 ? 2 : p.ovr >= 80 ? 1 : 0].push(p.id));
+  const out = [];
+  while (out.length < n) {
+    const r = R(), want = r < DU_RARE.d ? 2 : r < DU_RARE.d + DU_RARE.g ? 1 : 0;
+    const tier = [[0, 1, 2], [1, 0, 2], [2, 1, 0]][want].find(k => B[k].length); if (tier == null) break;
+    out.push(B[tier].pop());
+  }
+  return shuffle(out);
+}
 const DU_TURN_MS = 30000;
-const DU_EXTRA = { first: 7500, round: 12300, swap: 7300 };   // tempo extra no relógio do turno pras animações (sorteio, cartas entrando e saindo da mesa)
+const DU_EXTRA = { first: 7500, round: 12900, swap: 7900 };   // tempo extra no relógio do turno pras animações (sorteio, cartas entrando e saindo da mesa)
 class Duelo {
   constructor(db, o) {
     o = o || {}; this.db = db.map((p, i) => ({ ...p, id: i })); this.show = !!o.show;
@@ -1686,7 +1699,7 @@ class Duelo {
   draw() {
     const pos = this.pos, c = DU_CFG[pos], all = this.db.filter(p => p.pos === pos);
     this.prev = this.board ? this.board.map(b => b.slice()) : null;       // tabuleiros da rodada anterior (pra revelar o que ficou de fora)
-    this.board = [0, 1].map(() => shuffle(all).slice(0, c.n).map(p => p.id));
+    this.board = [0, 1].map(() => duDraw(all, c.n));
     this.fl = [[], []]; this.sel = [[], []]; this.ok = [false, false]; this.cur = (this.r + this.first) % 2;
   }
   flip(p, i) { const c = this.cfg; if (this.done || p !== this.cur || this.ok[p] || !Number.isInteger(i) || i < 0 || i >= c.n || this.fl[p].includes(i) || this.fl[p].length >= c.f) return false; this.fl[p].push(i); return true; }
@@ -4115,7 +4128,7 @@ function duSendMe() { const n = $('#dw-name'); if (!n) return; L.name = n.value.
 // ---------- mesa: uma só pros dois jogadores ----------
 // Cena = (rodada, de quem é o tabuleiro). Entra o sorteio da posição (caça-níquel), as cartas descem na mesa, quem joga vira e escolhe,
 // a escolha fica um instante na mesa e as cartas saem; aí vem a mesa do outro jogador. Os dois veem exatamente a mesma coisa.
-const T_HOLD = 1800, T_EXIT = 1000, T_PRE = 800, T_SPIN = 3000, T_LAND = 1100, T_DEALK = 240, T_DEAL = 800, REEL_H = 96;
+const T_HOLD = 1800, T_EXIT = 1000, T_PRE = 800, T_SPIN = 3000, T_LAND = 1100, T_DEALK = 170, T_DEAL = 800, REEL_H = 96;
 const DT = { disp: null, phase: 'none', lock: false, snaps: {}, pk: [[], []], timers: [], over: false, last: null };
 const dtDur = ms => REDUCED ? Math.min(ms, 200) : ms;
 const dtAt = (fn, ms) => { DT.timers.push(setTimeout(fn, dtDur(ms))); };
@@ -4191,14 +4204,14 @@ function dtIntro(tg) {
 function dtShow(tg, anim) {
   const s = DT.snaps[tg.r], c = s.cfg, root = $('#dt-stage');
   DT.disp = tg; DT.lock = !!anim; DT.phase = anim ? 'deal' : 'play'; dtHead(s, true);
-  root.innerHTML = `<div class="dtable ${anim ? 'dealing' : ''} inst">${[...Array(c.n).keys()].map(i => `<div class="dc" data-i="${i}" style="--k:${i}" role="button"><div class="in"><div class="face fbk">${DU_BACK}</div><div class="face fft"></div></div></div>`).join('')}</div>`;
+  root.innerHTML = `<div class="dtable n${c.n} ${anim ? 'dealing' : ''} inst">${[...Array(c.n).keys()].map(i => `<div class="dc" data-i="${i}" style="--k:${i}" role="button"><div class="in"><div class="face fbk">${DU_BACK}</div><div class="face fft"></div></div></div>`).join('')}</div>`;
   dtUpdate(); const tb = root.firstChild; void tb.offsetHeight; tb.classList.remove('inst');
   const ready = () => { DT.phase = 'play'; DT.lock = false; dtUpdate(); if (DU.mode === 'solo') duBot(); dtStep(); };
   if (anim) dtAt(ready, c.n * T_DEALK + T_DEAL); else ready();
 }
 function dtFront(id) {
   const p = duP(id), tier = DU.show ? duTier(p.ovr) : 'plain';
-  return [`face fft t-${tier}`, `${badge(frIdx(p), 46)}<span class="dn">${esc(p.name)}</span><span class="dp">${p.pos} · ${esc(p.tm)}</span><span class="dov num">${DU.show ? p.ovr : '??'}</span><i class="ck">✓</i>`];
+  return [`face fft t-${tier}`, `${badge(frIdx(p), DU_CFG.QB.n > 6 ? 36 : 46)}<span class="dn">${esc(p.name)}</span><span class="dp">${p.pos} · ${esc(p.tm)}</span><span class="dov num">${DU.show ? p.ovr : '??'}</span><i class="ck">✓</i>`];
 }
 // carta 90+ virada: brilho, explosão de faíscas e faixa "DIAMANTE" na mesa
 function dtLegend(el, root) {

@@ -761,6 +761,7 @@ html,body{overflow-x:hidden}
 /* mesa */
 .dstage{position:relative;border-radius:24px;padding:14px;min-height:360px;background:radial-gradient(120% 90% at 50% 0%,rgba(77,141,255,.22),rgba(255,255,255,.03) 70%);border:1px solid var(--line);overflow:hidden}
 .dtable{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.dtable.n9{gap:8px}.dtable.n9 .dc{height:122px}.dtable.n9 .dc .face{padding:6px 3px;gap:2px}.dtable.n9 .dn{font-size:12px}.dtable.n9 .dp{font-size:10.5px}.dtable.n9 .dov{font-size:19px}.dtable.n9 .fbk small{font-size:7px}.dtable.n9 .fbk svg{width:30px;height:30px}
 .dc{position:relative;perspective:800px;min-width:0;height:158px;cursor:default;outline:none}
 .dc.can{cursor:pointer}.dc.can:focus-visible .in{box-shadow:0 0 0 3px var(--hi)}
 .dc .in{position:absolute;inset:0;transition:transform .9s cubic-bezier(.3,.7,.2,1);transform-style:preserve-3d;border-radius:16px}
@@ -801,10 +802,10 @@ html[data-theme=light] .dc .fft{--cb:#fffdf7;color:#0f1a38}
 .tdot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:-4px}
 .tdot.b{background:linear-gradient(135deg,#f0b27a,#8a4f1d)}.tdot.g{background:linear-gradient(135deg,#fff3a8,#b8860b)}.tdot.d{background:linear-gradient(135deg,#c9f6ff,#5fb4ff,#e6d2ff)}
 /* cartas entram e saem */
-.dealing .dc{animation:dudeal .75s cubic-bezier(.2,.8,.25,1) both;animation-delay:calc(var(--k)*.24s)}
+.dealing .dc{animation:dudeal .75s cubic-bezier(.2,.8,.25,1) both;animation-delay:calc(var(--k)*.17s)}
 @keyframes dudeal{from{transform:translateY(-150px) rotate(-9deg) scale(.6);opacity:0}60%{opacity:1}to{transform:none;opacity:1}}
-.leaving .dc{animation:duout .8s cubic-bezier(.5,0,.8,.4) both;animation-delay:calc(var(--k)*.09s)}
-.leaving .dc.sel{animation-name:dupick;animation-delay:calc(var(--k)*.09s + .25s)}
+.leaving .dc{animation:duout .8s cubic-bezier(.5,0,.8,.4) both;animation-delay:calc(var(--k)*.06s)}
+.leaving .dc.sel{animation-name:dupick;animation-delay:calc(var(--k)*.06s + .25s)}
 @keyframes duout{to{transform:translateY(190px) rotate(8deg) scale(.7);opacity:0}}
 @keyframes dupick{40%{transform:translateY(-18px) scale(1.08);opacity:1}to{transform:translateY(-120px) scale(.7);opacity:0}}
 /* sorteio da posição (caça-níquel) */

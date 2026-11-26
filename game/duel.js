@@ -150,7 +150,7 @@ function duSendMe() { const n = $('#dw-name'); if (!n) return; L.name = n.value.
 // ---------- mesa: uma só pros dois jogadores ----------
 // Cena = (rodada, de quem é o tabuleiro). Entra o sorteio da posição (caça-níquel), as cartas descem na mesa, quem joga vira e escolhe,
 // a escolha fica um instante na mesa e as cartas saem; aí vem a mesa do outro jogador. Os dois veem exatamente a mesma coisa.
-const T_HOLD = 1800, T_EXIT = 1000, T_PRE = 800, T_SPIN = 3000, T_LAND = 1100, T_DEALK = 240, T_DEAL = 800, REEL_H = 96;
+const T_HOLD = 1800, T_EXIT = 1000, T_PRE = 800, T_SPIN = 3000, T_LAND = 1100, T_DEALK = 170, T_DEAL = 800, REEL_H = 96;
 const DT = { disp: null, phase: 'none', lock: false, snaps: {}, pk: [[], []], timers: [], over: false, last: null };
 const dtDur = ms => REDUCED ? Math.min(ms, 200) : ms;
 const dtAt = (fn, ms) => { DT.timers.push(setTimeout(fn, dtDur(ms))); };
@@ -226,14 +226,14 @@ function dtIntro(tg) {
 function dtShow(tg, anim) {
   const s = DT.snaps[tg.r], c = s.cfg, root = $('#dt-stage');
   DT.disp = tg; DT.lock = !!anim; DT.phase = anim ? 'deal' : 'play'; dtHead(s, true);
-  root.innerHTML = `<div class="dtable ${anim ? 'dealing' : ''} inst">${[...Array(c.n).keys()].map(i => `<div class="dc" data-i="${i}" style="--k:${i}" role="button"><div class="in"><div class="face fbk">${DU_BACK}</div><div class="face fft"></div></div></div>`).join('')}</div>`;
+  root.innerHTML = `<div class="dtable n${c.n} ${anim ? 'dealing' : ''} inst">${[...Array(c.n).keys()].map(i => `<div class="dc" data-i="${i}" style="--k:${i}" role="button"><div class="in"><div class="face fbk">${DU_BACK}</div><div class="face fft"></div></div></div>`).join('')}</div>`;
   dtUpdate(); const tb = root.firstChild; void tb.offsetHeight; tb.classList.remove('inst');
   const ready = () => { DT.phase = 'play'; DT.lock = false; dtUpdate(); if (DU.mode === 'solo') duBot(); dtStep(); };
   if (anim) dtAt(ready, c.n * T_DEALK + T_DEAL); else ready();
 }
 function dtFront(id) {
   const p = duP(id), tier = DU.show ? duTier(p.ovr) : 'plain';
-  return [`face fft t-${tier}`, `${badge(frIdx(p), 46)}<span class="dn">${esc(p.name)}</span><span class="dp">${p.pos} · ${esc(p.tm)}</span><span class="dov num">${DU.show ? p.ovr : '??'}</span><i class="ck">✓</i>`];
+  return [`face fft t-${tier}`, `${badge(frIdx(p), DU_CFG.QB.n > 6 ? 36 : 46)}<span class="dn">${esc(p.name)}</span><span class="dp">${p.pos} · ${esc(p.tm)}</span><span class="dov num">${DU.show ? p.ovr : '??'}</span><i class="ck">✓</i>`];
 }
 // carta 90+ virada: brilho, explosão de faíscas e faixa "DIAMANTE" na mesa
 function dtLegend(el, root) {
