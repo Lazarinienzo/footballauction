@@ -761,6 +761,18 @@ html,body{overflow-x:hidden}
 /* mesa */
 .dstage{position:relative;border-radius:24px;padding:14px;min-height:360px;background:radial-gradient(120% 90% at 50% 0%,rgba(77,141,255,.22),rgba(255,255,255,.03) 70%);border:1px solid var(--line);overflow:hidden}
 .dtable{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+/* telas largas: mesa no meio, um time de cada lado (anfitrião à esquerda) */
+@media (min-width:1000px){
+  #du-body.dwide{max-width:none;display:grid;grid-template-columns:minmax(220px,1fr) minmax(0,560px) minmax(220px,1fr);column-gap:32px;align-items:start}
+  #du-body.dwide>*{grid-column:2}
+  #du-body.dwide>.dcols{display:contents}
+  #du-body.dwide>.yard{display:none}
+  #du-body.dwide .dcol{position:sticky;top:16px;padding:16px 14px}
+  #du-body.dwide .dcol:nth-child(1){grid-column:1;grid-row:1/span 9}
+  #du-body.dwide .dcol:nth-child(2){grid-column:3;grid-row:1/span 9}
+  #du-body.dwide .dcn b{font-size:20px}
+  #du-body.dwide .dpr{font-size:13.5px;padding:6px 0}
+}
 .dtable.n9{gap:8px}.dtable.n9 .dc{height:122px}.dtable.n9 .dc .face{padding:6px 3px;gap:2px}.dtable.n9 .dn{font-size:12px}.dtable.n9 .dp{font-size:10.5px}.dtable.n9 .dov{font-size:19px}.dtable.n9 .fbk small{font-size:7px}.dtable.n9 .fbk svg{width:30px;height:30px}
 .dc{position:relative;perspective:800px;min-width:0;height:158px;cursor:default;outline:none}
 .dc.can{cursor:pointer}.dc.can:focus-visible .in{box-shadow:0 0 0 3px var(--hi)}
@@ -4078,6 +4090,7 @@ function duPicksHTML(ids, reveal) {
 function duPaint() {
   const el = $('#du-body'); if (!el || $('#duel').hidden) return;
   $('#du-tag').textContent = DU.mode === 'solo' ? 'Bot' : DU.mode === 'menu' ? t('Duelo') : 'Online';
+  if (DU.mode === 'menu' || DU.mode === 'wait') el.classList.remove('dwide');
   if (DU.mode === 'menu') return duMenu(el);
   if (DU.mode === 'wait') return duWait(el);
   if (!DU.v) { el.innerHTML = `<p class="note" style="text-align:center;padding:40px 0">${t('Conectando…')}</p>`; return; }
@@ -4154,6 +4167,7 @@ function dtStore(v) {
   DT.snaps[s.r] = s; DT.last = s;
 }
 function duShell(el) {
+  el.classList.add('dwide');
   el.innerHTML = `<div class="dhead"><div><small id="dh-r">&nbsp;</small><b class="dpos" id="dh-pos">?</b><em id="dh-sub">&nbsp;</em></div><div class="dtm"><b id="du-time" class="num">--</b><small>${t('segundos')}</small></div></div>
   <div class="dbar"><i id="du-bar"></i></div>
   <p class="note dstat" id="du-stat">&nbsp;</p>
@@ -4294,6 +4308,7 @@ function duTeamsFor(v) {
   return sh.teams(DU.seats);
 }
 function duDone(el, v) {
+  el.classList.remove('dwide');
   const T = duTeamsFor(v), g = duGameOf(T, v.seed), a = T[v.you], b = T[1 - v.you], win = (g.sa > g.sb ? 0 : 1) === v.you, mine = v.you === 0 ? [g.sa, g.sb] : [g.sb, g.sa];
   const nm = k => esc(duSeat(k).name), ov = x => `<td class="num">${x.rt.off.toFixed(1)}</td><td class="num">${x.rt.def.toFixed(1)}</td><td class="num"><b>${x.rt.all.toFixed(1)}</b></td>`;
   const banner = DU.played && $('#modal').hidden;

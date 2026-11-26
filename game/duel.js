@@ -100,6 +100,7 @@ function duPicksHTML(ids, reveal) {
 function duPaint() {
   const el = $('#du-body'); if (!el || $('#duel').hidden) return;
   $('#du-tag').textContent = DU.mode === 'solo' ? 'Bot' : DU.mode === 'menu' ? t('Duelo') : 'Online';
+  if (DU.mode === 'menu' || DU.mode === 'wait') el.classList.remove('dwide');
   if (DU.mode === 'menu') return duMenu(el);
   if (DU.mode === 'wait') return duWait(el);
   if (!DU.v) { el.innerHTML = `<p class="note" style="text-align:center;padding:40px 0">${t('Conectando…')}</p>`; return; }
@@ -176,6 +177,7 @@ function dtStore(v) {
   DT.snaps[s.r] = s; DT.last = s;
 }
 function duShell(el) {
+  el.classList.add('dwide');
   el.innerHTML = `<div class="dhead"><div><small id="dh-r">&nbsp;</small><b class="dpos" id="dh-pos">?</b><em id="dh-sub">&nbsp;</em></div><div class="dtm"><b id="du-time" class="num">--</b><small>${t('segundos')}</small></div></div>
   <div class="dbar"><i id="du-bar"></i></div>
   <p class="note dstat" id="du-stat">&nbsp;</p>
@@ -316,6 +318,7 @@ function duTeamsFor(v) {
   return sh.teams(DU.seats);
 }
 function duDone(el, v) {
+  el.classList.remove('dwide');
   const T = duTeamsFor(v), g = duGameOf(T, v.seed), a = T[v.you], b = T[1 - v.you], win = (g.sa > g.sb ? 0 : 1) === v.you, mine = v.you === 0 ? [g.sa, g.sb] : [g.sb, g.sa];
   const nm = k => esc(duSeat(k).name), ov = x => `<td class="num">${x.rt.off.toFixed(1)}</td><td class="num">${x.rt.def.toFixed(1)}</td><td class="num"><b>${x.rt.all.toFixed(1)}</b></td>`;
   const banner = DU.played && $('#modal').hidden;
